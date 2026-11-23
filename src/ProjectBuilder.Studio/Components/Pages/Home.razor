@@ -51,6 +51,7 @@ else
                 <td>@p.UpdatedUtc.ToLocalTime().ToString("g")</td>
                 <td class="text-end">
                     <a class="btn btn-sm btn-primary" href="designer/@p.Id">Open</a>
+                    <a class="btn btn-sm btn-outline-primary" href="preview/@p.Id">Preview</a>
                     <a class="btn btn-sm btn-success" href="download/@p.Id" download>Download</a>
                     <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(p.Id)">Delete</button>
                 </td>

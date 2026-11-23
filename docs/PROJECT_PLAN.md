@@ -42,6 +42,8 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 - [x] Entity/field/relationship editor (forms; drag-drop later)
 - [x] DB + target selection, validation display
 - [x] Download ZIP (generation history TODO)
+- [x] Live preview: Swagger "Try it out" against an in-memory mock + generated-code viewer
+- [ ] Preview of the Blazor web UI and Flutter app (when those generators exist)
 - [ ] Sign-up/login (ASP.NET Identity), per-user project storage
 
 ### Epic E – Templates

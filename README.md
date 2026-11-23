@@ -14,7 +14,7 @@ Requires the .NET 10 SDK.
 ```
 dotnet run --project src/ProjectBuilder.Studio
 ```
-Open the printed URL → pick the **Enrolment System** template → tweak → **Download**. Unzip, then:
+Open the printed URL → pick the **Enrolment System** template → tweak → **Preview** (live API + code) → **Download**. Unzip, then:
 
 ```
 cd EnrolmentSystem

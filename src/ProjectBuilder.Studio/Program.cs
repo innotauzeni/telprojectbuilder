@@ -39,6 +39,8 @@ app.MapGet("/download/{id:guid}", (Guid id, ProjectStore store) =>
     }
 });
 
+PreviewApi.Map(app);
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

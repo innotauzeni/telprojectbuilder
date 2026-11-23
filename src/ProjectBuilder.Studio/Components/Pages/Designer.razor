@@ -19,6 +19,7 @@
     <h1 class="h3 m-0 me-auto">Design: @model.Name</h1>
     @if (status is not null) { <span class="text-success small">@status</span> }
     <button class="btn btn-primary" @onclick="Save">Save</button>
+    <button class="btn btn-outline-primary" @onclick="PreviewIt">Preview</button>
     @if (errors.Count == 0)
     {
         <a class="btn btn-success" href="download/@Id" download data-enhance-nav="false" @onclick="Save">Download project (.zip)</a>
@@ -137,6 +138,12 @@
         if (model is null) return;
         Store.Save(Id, model.ToDefinition());
         status = "Saved " + DateTime.Now.ToString("T");
+    }
+
+    private void PreviewIt()
+    {
+        Save();
+        Nav.NavigateTo($"preview/{Id}");
     }
 
     private void AddEntity() =>
