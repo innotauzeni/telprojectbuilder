@@ -21,7 +21,13 @@ public static partial class AppDefinitionValidator
 
     // Names that would clash with generated infrastructure types.
     private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
-        { "AppDbContext", "Program", "Controller", "Task", "System" };
+        {
+            "AppDbContext", "Program", "Controller", "Task", "System",
+            // generated infrastructure
+            "DbSeeder", "PagedResult", "LoginRequest", "RegisterRequest", "AuthResponse", "Auth", "AuthController",
+            // ASP.NET Identity types / DbSet names inherited from IdentityDbContext
+            "IdentityUser", "IdentityRole", "User", "Role", "UserClaim", "UserLogin", "UserToken", "RoleClaim", "UserRole"
+        };
 
     [GeneratedRegex("^[A-Za-z][A-Za-z0-9]{0,63}$")]
     private static partial Regex IdentifierRegex();

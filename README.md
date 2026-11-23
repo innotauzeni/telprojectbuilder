@@ -5,7 +5,7 @@ choice of database, Docker files) from a visual design. Download the result and 
 no dependency on ProjectBuilder, so you own it completely. A web app and Flutter mobile app are on the roadmap.
 
 > **Status: early alpha (Phase 1).** Working today: Studio designer, Enrolment template, API generation for
-> SQLite / SQL Server / PostgreSQL, ZIP download. Not yet: generated login, DTOs, migrations, web/mobile UI.
+> SQLite / SQL Server / PostgreSQL, ZIP download. Generated APIs include JWT login with Admin/User roles. Not yet: migrations, per-entity permissions, web/mobile UI.
 > Do not expose the Studio publicly yet (no accounts). See the [roadmap](docs/ROADMAP.md).
 
 ## Quick start

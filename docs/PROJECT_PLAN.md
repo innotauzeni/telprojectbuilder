@@ -22,9 +22,10 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 - [x] EntityGenerator
 - [x] Scriban templates (DbContext, controllers, Program, csproj, Dockerfile)
 - [x] DbContext + per-provider packages/connection strings (SQLite, SQL Server, PostgreSQL)
-- [ ] DTOs + validators (FluentValidation) — API currently exposes entities directly
+- [x] DTOs with validation attributes (entities never exposed by the API)
 - [x] CRUD endpoints + paging + Swagger (search/filter TODO)
-- [ ] Auth scaffold (Identity/JWT, roles)
+- [x] Auth scaffold: Identity + JWT, Admin/User roles, lockout, per-project random secrets + seeded admin
+- [ ] Per-entity permissions (which role can do what) designed in Studio
 - [x] Dockerfile + docker-compose per DB
 - [x] README (SQL script export TODO)
 - [x] Project packager (ZIP, `.gitignore`; solution file TODO)
@@ -34,7 +35,7 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 ### Epic C – Quality harness
 - [ ] Golden-file tests per generator
 - [x] Generate → `dotnet build` integration test per DB (CI runs it)
-- [ ] Automated generate → run → hit Swagger/CRUD test (verified manually so far)
+- [x] Automated generate → run → login → CRUD → role checks test (SQLite)
 - [ ] Testcontainers run against real SQL Server / PostgreSQL
 
 ### Epic D – Studio

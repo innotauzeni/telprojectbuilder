@@ -19,12 +19,14 @@ internal static class Tpl
     }
 
     public const string DbContext = """
+        using Microsoft.AspNetCore.Identity;
+        using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
         using Microsoft.EntityFrameworkCore;
         using {{ Ns }}.Domain;
 
         namespace {{ Ns }}.Data;
 
-        public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+        public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<IdentityUser>(options)
         {
         {{~ for e in Entities ~}}
             public DbSet<{{ e.Name }}> {{ e.Plural }} => Set<{{ e.Name }}>();
@@ -47,62 +49,106 @@ internal static class Tpl
         }
         """;
 
+    public const string Dto = """
+        using System.ComponentModel.DataAnnotations;
+        using {{ Ns }}.Domain;
+
+        namespace {{ Ns }}.Dtos;
+
+        /// <summary>What API clients send and receive for {{ Name }} (never the raw database entity).</summary>
+        public class {{ Name }}Dto
+        {
+            public Guid Id { get; set; }
+        {{~ for p in Props ~}}
+        {{~ for a in p.Attrs ~}}
+            {{ a }}
+        {{~ end ~}}
+            {{ p.Decl }}
+        {{~ end ~}}
+
+            public static {{ Name }}Dto From({{ Name }} e) => new()
+            {
+                Id = e.Id,
+        {{~ for p in Props ~}}
+                {{ p.Name }} = e.{{ p.Name }},
+        {{~ end ~}}
+            };
+
+            public void ApplyTo({{ Name }} e)
+            {
+        {{~ for p in Props ~}}
+                e.{{ p.Name }} = {{ p.Name }};
+        {{~ end ~}}
+            }
+        }
+        """;
+
     public const string Controller = """
+        using Microsoft.AspNetCore.Authorization;
         using Microsoft.AspNetCore.Mvc;
         using Microsoft.EntityFrameworkCore;
         using {{ Ns }}.Data;
         using {{ Ns }}.Domain;
+        using {{ Ns }}.Dtos;
 
         namespace {{ Ns }}.Controllers;
 
         [ApiController]
+        [Authorize]
         [Route("api/{{ Route }}")]
         public class {{ Plural }}Controller(AppDbContext db) : ControllerBase
         {
+            private const string SaveError = "Could not save: a unique value is duplicated or a linked record does not exist.";
+
             [HttpGet]
-            public async Task<ActionResult<PagedResult<{{ Name }}>>> List([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+            public async Task<ActionResult<PagedResult<{{ Name }}Dto>>> List([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
             {
                 page = Math.Max(page, 1);
                 pageSize = Math.Clamp(pageSize, 1, 200);
                 var total = await db.{{ Plural }}.CountAsync();
                 var items = await db.{{ Plural }}.AsNoTracking().OrderBy(x => x.Id)
                     .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-                return new PagedResult<{{ Name }}>(items, total, page, pageSize);
+                return new PagedResult<{{ Name }}Dto>(items.Select({{ Name }}Dto.From).ToList(), total, page, pageSize);
             }
 
             [HttpGet("{id:guid}")]
-            public async Task<ActionResult<{{ Name }}>> Get(Guid id)
+            public async Task<ActionResult<{{ Name }}Dto>> Get(Guid id)
             {
-                var item = await db.{{ Plural }}.FindAsync(id);
-                return item is null ? NotFound() : item;
+                var item = await db.{{ Plural }}.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+                return item is null ? NotFound() : {{ Name }}Dto.From(item);
             }
 
             [HttpPost]
-            public async Task<ActionResult<{{ Name }}>> Create({{ Name }} item)
+            public async Task<ActionResult<{{ Name }}Dto>> Create({{ Name }}Dto dto)
             {
-                item.Id = Guid.NewGuid();
+                var item = new {{ Name }} { Id = Guid.NewGuid() };
+                dto.ApplyTo(item);
                 db.{{ Plural }}.Add(item);
-                await db.SaveChangesAsync();
-                return CreatedAtAction(nameof(Get), new { id = item.Id }, item);
+                try { await db.SaveChangesAsync(); }
+                catch (DbUpdateException) { return Problem(SaveError, statusCode: StatusCodes.Status409Conflict); }
+                return CreatedAtAction(nameof(Get), new { id = item.Id }, {{ Name }}Dto.From(item));
             }
 
             [HttpPut("{id:guid}")]
-            public async Task<IActionResult> Update(Guid id, {{ Name }} item)
+            public async Task<IActionResult> Update(Guid id, {{ Name }}Dto dto)
             {
-                if (!await db.{{ Plural }}.AnyAsync(x => x.Id == id)) return NotFound();
-                item.Id = id;
-                db.Update(item);
-                await db.SaveChangesAsync();
+                var item = await db.{{ Plural }}.FindAsync(id);
+                if (item is null) return NotFound();
+                dto.ApplyTo(item);
+                try { await db.SaveChangesAsync(); }
+                catch (DbUpdateException) { return Problem(SaveError, statusCode: StatusCodes.Status409Conflict); }
                 return NoContent();
             }
 
             [HttpDelete("{id:guid}")]
+            [Authorize(Roles = "Admin")]
             public async Task<IActionResult> Delete(Guid id)
             {
                 var item = await db.{{ Plural }}.FindAsync(id);
                 if (item is null) return NotFound();
                 db.{{ Plural }}.Remove(item);
-                await db.SaveChangesAsync();
+                try { await db.SaveChangesAsync(); }
+                catch (DbUpdateException) { return Problem("Could not delete: other records still depend on this one.", statusCode: StatusCodes.Status409Conflict); }
                 return NoContent();
             }
         }
@@ -114,27 +160,193 @@ internal static class Tpl
         public record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
         """;
 
+    public const string AuthController = """
+        using System.Security.Claims;
+        using System.ComponentModel.DataAnnotations;
+        using System.Text;
+        using Microsoft.AspNetCore.Authorization;
+        using Microsoft.AspNetCore.Identity;
+        using Microsoft.AspNetCore.Mvc;
+        using Microsoft.IdentityModel.JsonWebTokens;
+        using Microsoft.IdentityModel.Tokens;
+
+        namespace {{ Ns }}.Controllers;
+
+        public record LoginRequest([Required, EmailAddress] string Email, [Required] string Password);
+        public record RegisterRequest([Required, EmailAddress] string Email, [Required] string Password, string Role = "User");
+        public record AuthResponse(string Token, DateTime ExpiresUtc, string Email, IList<string> Roles);
+
+        [ApiController]
+        [Route("api/auth")]
+        public class AuthController(UserManager<IdentityUser> users, IConfiguration config) : ControllerBase
+        {
+            private static readonly string[] AllowedRoles = ["Admin", "User"];
+
+            /// <summary>Log in and receive a JWT. In Swagger, click Authorize and paste the token.</summary>
+            [HttpPost("login")]
+            [AllowAnonymous]
+            public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
+            {
+                var user = await users.FindByEmailAsync(request.Email);
+                if (user is null) return Unauthorized();
+                if (await users.IsLockedOutAsync(user))
+                    return Problem("Too many failed attempts. Try again later.", statusCode: StatusCodes.Status429TooManyRequests);
+                if (!await users.CheckPasswordAsync(user, request.Password))
+                {
+                    await users.AccessFailedAsync(user);
+                    return Unauthorized();
+                }
+                await users.ResetAccessFailedCountAsync(user);
+                var roles = await users.GetRolesAsync(user);
+                return CreateToken(user, roles);
+            }
+
+            /// <summary>Create a user. Admins only.</summary>
+            [HttpPost("register")]
+            [Authorize(Roles = "Admin")]
+            public async Task<IActionResult> Register(RegisterRequest request)
+            {
+                if (!AllowedRoles.Contains(request.Role)) return BadRequest("Role must be Admin or User.");
+                var user = new IdentityUser { UserName = request.Email, Email = request.Email, EmailConfirmed = true };
+                var result = await users.CreateAsync(user, request.Password);
+                if (!result.Succeeded) return BadRequest(result.Errors.Select(e => e.Description));
+                await users.AddToRoleAsync(user, request.Role);
+                return Created(string.Empty, new { user.Email, request.Role });
+            }
+
+            [HttpGet("me")]
+            [Authorize]
+            public IActionResult Me() => Ok(new
+            {
+                Email = User.FindFirstValue("email"),
+                Roles = User.FindAll("role").Select(c => c.Value)
+            });
+
+            private AuthResponse CreateToken(IdentityUser user, IList<string> roles)
+            {
+                var jwt = config.GetSection("Jwt");
+                var expires = DateTime.UtcNow.AddHours(8);
+                var claims = new List<Claim>
+                {
+                    new("sub", user.Id),
+                    new("email", user.Email ?? ""),
+                    new("name", user.UserName ?? "")
+                };
+                claims.AddRange(roles.Select(r => new Claim("role", r)));
+
+                var descriptor = new SecurityTokenDescriptor
+                {
+                    Subject = new ClaimsIdentity(claims),
+                    Expires = expires,
+                    Issuer = jwt["Issuer"],
+                    Audience = jwt["Audience"],
+                    SigningCredentials = new SigningCredentials(
+                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!)), SecurityAlgorithms.HmacSha256)
+                };
+                var token = new JsonWebTokenHandler().CreateToken(descriptor);
+                return new AuthResponse(token, expires, user.Email ?? "", roles);
+            }
+        }
+        """;
+
+    public const string DbSeeder = """
+        using Microsoft.AspNetCore.Identity;
+
+        namespace {{ Ns }}.Data;
+
+        /// <summary>Creates the Admin/User roles and the first admin account (from the Seed section of appsettings).</summary>
+        public static class DbSeeder
+        {
+            public static async Task SeedAsync(IServiceProvider services, IConfiguration config)
+            {
+                var roles = services.GetRequiredService<RoleManager<IdentityRole>>();
+                foreach (var role in new[] { "Admin", "User" })
+                    if (!await roles.RoleExistsAsync(role)) await roles.CreateAsync(new IdentityRole(role));
+
+                var email = config["Seed:AdminEmail"];
+                var password = config["Seed:AdminPassword"];
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password)) return;
+
+                var users = services.GetRequiredService<UserManager<IdentityUser>>();
+                if (await users.FindByEmailAsync(email) is not null) return;
+
+                var admin = new IdentityUser { UserName = email, Email = email, EmailConfirmed = true };
+                var result = await users.CreateAsync(admin, password);
+                if (!result.Succeeded)
+                    throw new InvalidOperationException("Could not create the admin user: " + string.Join("; ", result.Errors.Select(e => e.Description)));
+                await users.AddToRoleAsync(admin, "Admin");
+            }
+        }
+        """;
+
     public const string Program = """
+        using System.Text;
+        using Microsoft.AspNetCore.Identity;
         using Microsoft.EntityFrameworkCore;
+        using Microsoft.IdentityModel.Tokens;
+        using Microsoft.OpenApi.Models;
         using {{ Ns }}.Data;
 
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddDbContext<AppDbContext>(o =>
             o.{{ UseCall }}(builder.Configuration.GetConnectionString("Default")));
-        builder.Services.AddControllers().AddJsonOptions(o =>
-            o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
+
+        builder.Services.AddIdentityCore<IdentityUser>(o =>
+            {
+                o.Password.RequiredLength = 8;
+                o.Lockout.MaxFailedAccessAttempts = 5;
+                o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
+            })
+            .AddRoles<IdentityRole>()
+            .AddEntityFrameworkStores<AppDbContext>();
+
+        var jwt = builder.Configuration.GetSection("Jwt");
+        builder.Services.AddAuthentication("Bearer").AddJwtBearer(o =>
+        {
+            o.MapInboundClaims = false;
+            o.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true, ValidIssuer = jwt["Issuer"],
+                ValidateAudience = true, ValidAudience = jwt["Audience"],
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!)),
+                ValidateLifetime = true,
+                NameClaimType = "name",
+                RoleClaimType = "role"
+            };
+        });
+        builder.Services.AddAuthorization();
+
+        builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
+        builder.Services.AddSwaggerGen(c =>
+        {
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Name = "Authorization", Type = SecuritySchemeType.Http, Scheme = "bearer",
+                BearerFormat = "JWT", In = ParameterLocation.Header,
+                Description = "Log in via POST /api/auth/login, then paste the token here."
+            });
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } }, Array.Empty<string>() }
+            });
+        });
 
         var app = builder.Build();
 
-        // First run: create the database. Switch to EF migrations before going to production (see README).
+        // First run: create the database and the first admin. Switch to EF migrations before production (see README).
         using (var scope = app.Services.CreateScope())
+        {
             scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
+            await DbSeeder.SeedAsync(scope.ServiceProvider, builder.Configuration);
+        }
 
         app.UseSwagger();
         app.UseSwaggerUI();
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.MapControllers();
         app.MapGet("/", () => Results.Redirect("/swagger"));
         app.Run();
@@ -150,6 +362,8 @@ internal static class Tpl
           </PropertyGroup>
           <ItemGroup>
             <PackageReference Include="{{ ProviderPackage }}" Version="{{ ProviderVersion }}" />
+            <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.*" />
+            <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.*" />
             <PackageReference Include="Swashbuckle.AspNetCore" Version="9.*" />
           </ItemGroup>
         </Project>
