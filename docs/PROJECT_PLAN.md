@@ -36,6 +36,7 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 - [ ] Golden-file tests per generator
 - [x] Generate → `dotnet build` integration test per DB (CI runs it)
 - [x] Automated generate → run → login → CRUD → role checks test (SQLite)
+- [x] Browser click-through of the generated web app (tests/e2e-web: login, create, edit, link, delete, logout) — runs in CI
 - [ ] Testcontainers run against real SQL Server / PostgreSQL
 
 ### Epic D – Studio

@@ -1,0 +1,12 @@
+{
+  "name": "projectbuilder-e2e-web",
+  "private": true,
+  "type": "module",
+  "description": "Drives a real browser through a generated system (login, create, edit, link, delete).",
+  "scripts": {
+    "test": "node run.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

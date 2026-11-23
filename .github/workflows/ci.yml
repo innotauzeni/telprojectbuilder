@@ -19,3 +19,24 @@ jobs:
       - run: dotnet build -c Release
       # Includes tests that generate, build and run real projects (needs NuGet + npm access).
       - run: dotnet test -c Release --no-build
+  e2e-web:
+    # Generates the Enrolment system, builds its Angular app and clicks through it in real Chrome.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Generate the Enrolment system
+        run: dotnet test tests/ProjectBuilder.Generator.Tests --filter "Category=Manual"
+        env:
+          PB_EMIT: ${{ runner.temp }}/enrolment
+      - name: Build its web app
+        run: npm install --no-audit --no-fund && npm run build
+        working-directory: ${{ runner.temp }}/enrolment/web
+      - name: Browser test
+        run: npm install --no-audit --no-fund && node run.mjs "${{ runner.temp }}/enrolment"
+        working-directory: tests/e2e-web
