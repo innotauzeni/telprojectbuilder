@@ -2,10 +2,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProjectBuilder.Core\ProjectBuilder.Core.csproj" />
+    <PackageReference Include="Scriban" Version="7.6.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Scriban" Version="7.6.1" />
+    <!-- The Angular web app template ships inside the generator and is copied into every generated system. -->
+    <EmbeddedResource Include="AngularTemplate\**\*" LogicalName="AngularTemplate/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1,0 +1,5 @@
+{
+  "/api": { "target": "http://localhost:5230", "secure": false },
+  "/preview": { "target": "http://localhost:5230", "secure": false },
+  "/download": { "target": "http://localhost:5230", "secure": false }
+}

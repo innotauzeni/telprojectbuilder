@@ -29,7 +29,7 @@ public class GeneratedAppEndToEndTests
         try
         {
             new ProjectGenerator().WriteTo(ProjectGeneratorTests.Enrolment(), dir);
-            var settings = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "appsettings.json")))!;
+            var settings = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "api", "appsettings.json")))!;
             var adminEmail = (string)settings["Seed"]!["AdminEmail"]!;
             var adminPassword = (string)settings["Seed"]!["AdminPassword"]!;
 
@@ -37,7 +37,7 @@ public class GeneratedAppEndToEndTests
             var baseUrl = $"http://127.0.0.1:{port}";
             proc = Process.Start(new ProcessStartInfo("dotnet", $"run --no-launch-profile --urls {baseUrl}")
             {
-                WorkingDirectory = dir, UseShellExecute = false, CreateNoWindow = true
+                WorkingDirectory = Path.Combine(dir, "api"), UseShellExecute = false, CreateNoWindow = true
             })!;
 
             using var http = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(30) };

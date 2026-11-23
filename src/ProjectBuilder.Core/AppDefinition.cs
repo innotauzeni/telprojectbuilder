@@ -13,7 +13,7 @@ public enum Targets
 {
     None = 0,
     WebApi = 1,        // ASP.NET Core API + Swagger
-    WebApp = 2,        // Blazor / MVC admin UI
+    WebApp = 2,        // Angular admin web app
     FlutterApp = 4,    // Flutter client from OpenAPI
     Docker = 8,        // Dockerfile + compose
     All = WebApi | WebApp | FlutterApp | Docker

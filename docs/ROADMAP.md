@@ -10,7 +10,7 @@ Flutter mobile app) that they own and can deploy anywhere. No lock-in: the outpu
 
 ```
  Studio (visual designer)  ──edits──▶  AppDefinition (JSON)  ──▶  Generators  ──▶  ZIP download
-        Blazor                          single source of truth     Scriban/Roslyn     C# solution, Docker,
+        Angular                          single source of truth     Scriban/Roslyn     C# solution, Docker,
                                                                                       SQL, Flutter app
 ```
 
@@ -22,7 +22,7 @@ We generate plain, readable, conventional C# that a developer could have written
 |---|---|
 | Domain/Data | Entities, EF Core DbContext, migrations, seed data |
 | Web API | ASP.NET Core minimal/controller API, DTOs, validation, JWT auth + roles, **Swagger/OpenAPI** |
-| Web App | Blazor admin UI (list/create/edit/detail, search, paging) calling the API |
+| Web App | **Angular** admin app (login, list/create/edit, paging, lookups) calling the API |
 | Mobile | Flutter app generated from the OpenAPI spec (login + CRUD screens) |
 | Ops | Dockerfile, docker-compose (app + db), `appsettings`, deployment README, SQL script |
 | Tests | Generated smoke/API tests so the output is verified |
@@ -34,8 +34,9 @@ MongoDB/other NoSQL is deliberately out of scope until v2 (different data model,
 ```
 src/
   ProjectBuilder.Core        AppDefinition model, validation, versioning of the schema
-  ProjectBuilder.Generator   IGenerator implementations + template packs (Entities, Api, Blazor, Flutter, Docker)
-  ProjectBuilder.Studio      Blazor web app: designer, template gallery, preview, download, accounts
+  ProjectBuilder.Generator   IGenerator implementations + template packs (Entities, Api, Angular, Flutter, Docker)
+  ProjectBuilder.Studio      ASP.NET Core API that serves the Studio UI + preview + download (accounts later)
+  studio-web                 Angular app: template gallery, designer, preview
   (later) ProjectBuilder.Api   Platform API (projects, billing, generation jobs)
   (later) ProjectBuilder.Worker Background generation + "compile check" sandbox
 tests/
@@ -73,7 +74,7 @@ Key engineering rules:
 - **Exit:** a non-developer designs the enrolment system and the downloaded ZIP runs with `docker compose up`.
 
 ### Phase 2 – Web UI + Auth (weeks 9–14)
-- Generate Blazor admin UI (grids, forms, search, paging, lookups).
+- Angular admin UI generator (done v1: login, grids, forms, paging, lookups); next: search, filters, per-role screens.
 - Generated auth: users, roles, permissions per entity, JWT.
 - Add MySQL + Oracle. Seed data and SQL scripts export.
 - Template #2: School Management (classes, subjects, timetable, attendance, grades, report cards, fees).

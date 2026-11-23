@@ -29,6 +29,10 @@ public static partial class AppDefinitionValidator
             "IdentityUser", "IdentityRole", "User", "Role", "UserClaim", "UserLogin", "UserToken", "RoleClaim", "UserRole"
         };
 
+    private const int MaxEntities = 100;
+    private const int MaxFieldsPerEntity = 100;
+    private const int MaxRelationsPerEntity = 50;
+
     [GeneratedRegex("^[A-Za-z][A-Za-z0-9]{0,63}$")]
     private static partial Regex IdentifierRegex();
 
@@ -45,6 +49,13 @@ public static partial class AppDefinitionValidator
             errors.Add($"App name '{app.Name}' is reserved.");
 
         if (app.Entities.Count == 0) errors.Add("Add at least one entity.");
+        if (app.Entities.Count > MaxEntities) errors.Add($"A system can have at most {MaxEntities} entities.");
+        foreach (var e in app.Entities)
+        {
+            if (e.Fields.Count > MaxFieldsPerEntity) errors.Add($"'{e.Name}' has more than {MaxFieldsPerEntity} fields.");
+            if (e.Relations.Count > MaxRelationsPerEntity) errors.Add($"'{e.Name}' has more than {MaxRelationsPerEntity} links.");
+        }
+        if (errors.Count > 0 && app.Entities.Count > MaxEntities) return errors; // don't walk an oversized design
 
         var entityNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var e in app.Entities)

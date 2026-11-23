@@ -51,10 +51,10 @@ public class ProjectGeneratorTests
     {
         var gen = new ProjectGenerator();
         var files = gen.Generate(Enrolment());
-        Assert.Contains(files, f => f.Path == "Controllers/StudentsController.cs");
-        Assert.Contains(files, f => f.Path == "Data/AppDbContext.cs");
-        Assert.Contains(files, f => f.Path == "EnrolmentSystem.csproj");
-        Assert.Contains(files, f => f.Path == "Dockerfile");
+        Assert.Contains(files, f => f.Path == "api/Controllers/StudentsController.cs");
+        Assert.Contains(files, f => f.Path == "api/Data/AppDbContext.cs");
+        Assert.Contains(files, f => f.Path == "api/EnrolmentSystem.csproj");
+        Assert.Contains(files, f => f.Path == "api/Dockerfile");
         Assert.True(gen.ToZip(Enrolment()).Length > 1000);
     }
 
@@ -74,7 +74,7 @@ public class ProjectGeneratorTests
             new ProjectGenerator().WriteTo(Enrolment(db), dir);
             var psi = new ProcessStartInfo("dotnet", "build --nologo -v q")
             {
-                WorkingDirectory = dir, RedirectStandardOutput = true, RedirectStandardError = true
+                WorkingDirectory = Path.Combine(dir, "api"), RedirectStandardOutput = true, RedirectStandardError = true
             };
             using var p = Process.Start(psi)!;
             var output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();

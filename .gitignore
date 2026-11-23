@@ -481,3 +481,9 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 App_Data/
+
+# Studio web app build output and dependencies
+src/ProjectBuilder.Studio/wwwroot/*
+!src/ProjectBuilder.Studio/wwwroot/.gitkeep
+node_modules/
+.angular/

@@ -8,5 +8,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Studio web app (Angular) -> src/ProjectBuilder.Studio/wwwroot
+      - run: npm install --no-audit --no-fund
+        working-directory: src/studio-web
+      - run: npm run build
+        working-directory: src/studio-web
       - run: dotnet build -c Release
+      # Includes tests that generate, build and run real projects (needs NuGet + npm access).
       - run: dotnet test -c Release --no-build

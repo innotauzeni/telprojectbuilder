@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "Enrolment System",
   "database": "Sqlite",
-  "targets": "WebApi, Docker",
+  "targets": "WebApi, WebApp, Docker",
   "entities": [
     {
       "name": "Student",

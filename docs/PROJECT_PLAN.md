@@ -44,7 +44,7 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 - [x] DB + target selection, validation display
 - [x] Download ZIP (generation history TODO)
 - [x] Live preview: Swagger "Try it out" against an in-memory mock + generated-code viewer
-- [ ] Preview of the Blazor web UI and Flutter app (when those generators exist)
+- [ ] Preview of the generated Angular web UI and Flutter app (API preview done; UI preview TODO)
 - [ ] Sign-up/login (ASP.NET Identity), per-user project storage
 
 ### Epic E – Templates
@@ -65,4 +65,4 @@ Docker Desktop, GitHub Actions. Flutter SDK needed only from Phase 3 (not instal
 1. Studio hosting: public SaaS vs. downloadable desktop tool? (Recommendation: SaaS web, generated output fully self-hostable.)
 2. Generated API style: minimal APIs vs. controllers (Recommendation: controllers – more familiar to most C# developers; **currently implemented**).
 3. Business model: free tier + paid (DBs/Flutter/templates) vs. one-time license.
-4. Generated UI: Blazor Server vs. Blazor WASM vs. MVC (Recommendation: Blazor Web App with API calls).
+4. Generated UI: **Angular** (decided; replaces Blazor everywhere, Studio included).

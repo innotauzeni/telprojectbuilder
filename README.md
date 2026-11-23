@@ -1,37 +1,51 @@
 # ProjectBuilder
 
-Open-source, no-code builder that generates **production-style C# systems** (ASP.NET Core Web API + Swagger, your
-choice of database, Docker files) from a visual design. Download the result and deploy it anywhere. The output has
-no dependency on ProjectBuilder, so you own it completely. A web app and Flutter mobile app are on the roadmap.
+Open-source, no-code builder that generates **production-style C# systems** from a visual design: an ASP.NET Core
+Web API with Swagger and JWT login, an **Angular** web app, your choice of database, and Docker files. Download the
+result and deploy it anywhere. The output has no dependency on ProjectBuilder, so you own it completely.
+A Flutter mobile app is on the roadmap.
 
-> **Status: early alpha (Phase 1).** Working today: Studio designer, Enrolment template, API generation for
-> SQLite / SQL Server / PostgreSQL, ZIP download. Generated APIs include JWT login with Admin/User roles. Not yet: migrations, per-entity permissions, web/mobile UI.
-> Do not expose the Studio publicly yet (no accounts). See the [roadmap](docs/ROADMAP.md).
+> **Status: early alpha (Phase 1).** Working today: Studio designer + live preview, Enrolment template, API generation
+> for SQLite / SQL Server / PostgreSQL with login and Admin/User roles, generated Angular web app, ZIP download.
+> Not yet: migrations, per-entity permissions, Flutter app. Do not expose the Studio publicly yet (no accounts).
+> See the [roadmap](docs/ROADMAP.md).
 
 ## Quick start
-Requires the .NET 10 SDK.
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and Node.js 20.19+ / 22.12+ / 24+ (for the Angular Studio).
 
 ```
-dotnet run --project src/ProjectBuilder.Studio
-```
-Open the printed URL → pick the **Enrolment System** template → tweak → **Preview** (live API + code) → **Download**. Unzip, then:
+# 1. Build the Studio web app (once, and after changing src/studio-web)
+cd src/studio-web
+npm install
+npm run build
 
+# 2. Run the Studio
+cd ../..
+dotnet run --project src/ProjectBuilder.Studio --urls http://localhost:5230
+```
+Open http://localhost:5230 → pick the **Enrolment System** template → tweak → **Preview** (live API + code) → **Download**.
+
+Working on the Studio UI itself? Run `dotnet run` as above and, in `src/studio-web`, `npm start`
+(live reload at http://localhost:4200, proxied to the .NET server on port 5230).
+
+### Run what you downloaded
 ```
 cd EnrolmentSystem
-dotnet run          # Swagger UI at the printed URL
-# or
-docker compose up --build
+docker compose up --build      # API http://localhost:8080/swagger, web app http://localhost:8081
 ```
+or without Docker: `cd api && dotnet run --urls http://localhost:5000`, then `cd web && npm install && npm start`.
+The first admin login is in `api/appsettings.json` (generated uniquely for every download); the download's README explains the rest.
 
 ## How it works
-The designer edits one JSON file (the `AppDefinition`). Generators turn it into plain C# source.
+The designer edits one JSON file (the `AppDefinition`). Generators turn it into plain source code.
 
 ```
 src/ProjectBuilder.Core        definition model, JSON, validation
-src/ProjectBuilder.Generator   Scriban-based generators + ZIP packager
-src/ProjectBuilder.Studio      Blazor designer
+src/ProjectBuilder.Generator   Scriban generators (C# API) + Angular template + ZIP packager
+src/ProjectBuilder.Studio      ASP.NET Core API serving the Studio, preview and downloads
+src/studio-web                 Angular app: template gallery, designer, preview
 templates/                     starter systems (JSON)
-tests/                         unit tests + "generated project builds" tests
+tests/                         unit tests + tests that build and run the generated projects
 ```
 
 ## Docs
