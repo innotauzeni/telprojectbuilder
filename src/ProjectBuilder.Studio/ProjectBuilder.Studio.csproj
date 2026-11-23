@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProjectBuilder.Core\ProjectBuilder.Core.csproj" />
+    <ProjectReference Include="..\ProjectBuilder.Generator\ProjectBuilder.Generator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Starter templates ship next to the app -->
+    <Content Include="..\..\templates\*.json" Link="templates\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+</Project>

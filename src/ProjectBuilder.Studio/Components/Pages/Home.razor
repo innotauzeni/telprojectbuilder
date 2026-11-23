@@ -1,0 +1,75 @@
+@page "/"
+@rendermode InteractiveServer
+@inject ProjectBuilder.Studio.Services.ProjectStore Store
+@inject NavigationManager Nav
+
+<PageTitle>ProjectBuilder</PageTitle>
+
+<h1>Build a system without writing code</h1>
+<p class="lead">Design your entities, pick a database, and download a complete C# Web API with Swagger, ready to deploy.</p>
+
+<h2 class="h4 mt-4">Start a new project</h2>
+<div class="row g-3">
+    @foreach (var t in Store.Templates())
+    {
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">@t.Name</h5>
+                    <p class="card-text text-muted">Starter template · @t.EntityCount entities</p>
+                    <button class="btn btn-primary" @onclick="() => Create(t.Key)">Use template</button>
+                </div>
+            </div>
+        </div>
+    }
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Blank project</h5>
+                <p class="card-text text-muted">Start from scratch.</p>
+                <button class="btn btn-outline-primary" @onclick="() => Create(null)">Create blank</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h2 class="h4 mt-5">Your projects</h2>
+@if (projects.Count == 0)
+{
+    <p class="text-muted">No projects yet. Pick a template above.</p>
+}
+else
+{
+    <table class="table align-middle">
+        <thead><tr><th>Name</th><th>Entities</th><th>Updated</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var p in projects)
+        {
+            <tr>
+                <td>@p.Name</td>
+                <td>@p.EntityCount</td>
+                <td>@p.UpdatedUtc.ToLocalTime().ToString("g")</td>
+                <td class="text-end">
+                    <a class="btn btn-sm btn-primary" href="designer/@p.Id">Open</a>
+                    <a class="btn btn-sm btn-success" href="download/@p.Id" download>Download</a>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(p.Id)">Delete</button>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<ProjectBuilder.Studio.Services.ProjectSummary> projects = [];
+
+    protected override void OnInitialized() => projects = Store.List();
+
+    private void Create(string? key) => Nav.NavigateTo($"designer/{Store.Create(key)}");
+
+    private void Delete(Guid id)
+    {
+        Store.Delete(id);
+        projects = Store.List();
+    }
+}

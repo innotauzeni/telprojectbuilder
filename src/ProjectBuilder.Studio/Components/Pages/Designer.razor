@@ -1,0 +1,163 @@
+@page "/designer/{Id:guid}"
+@rendermode InteractiveServer
+@using ProjectBuilder.Core
+@using ProjectBuilder.Generator
+@using ProjectBuilder.Studio.Services
+@inject ProjectStore Store
+@inject NavigationManager Nav
+
+<PageTitle>@(model?.Name ?? "Designer")</PageTitle>
+
+@if (model is null)
+{
+    <p>Project not found. <a href="">Back to projects</a></p>
+    return;
+}
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a href="" class="btn btn-sm btn-outline-secondary">← Projects</a>
+    <h1 class="h3 m-0 me-auto">Design: @model.Name</h1>
+    @if (status is not null) { <span class="text-success small">@status</span> }
+    <button class="btn btn-primary" @onclick="Save">Save</button>
+    @if (errors.Count == 0)
+    {
+        <a class="btn btn-success" href="download/@Id" download data-enhance-nav="false" @onclick="Save">Download project (.zip)</a>
+    }
+    else
+    {
+        <button class="btn btn-success" disabled title="Fix the problems below first">Download project (.zip)</button>
+    }
+</div>
+
+@if (errors.Count > 0)
+{
+    <div class="alert alert-warning">
+        <strong>Fix these before downloading:</strong>
+        <ul class="mb-0">@foreach (var e in errors) { <li>@e</li> }</ul>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-body row g-3">
+        <div class="col-md-5">
+            <label class="form-label">System name</label>
+            <input class="form-control" @bind="model.Name" @bind:event="oninput" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Database</label>
+            <select class="form-select" @bind="model.Database">
+                <option value="@DbProvider.Sqlite">SQLite (easiest, single file)</option>
+                <option value="@DbProvider.SqlServer">SQL Server</option>
+                <option value="@DbProvider.PostgreSql">PostgreSQL</option>
+                <option disabled>MySQL — coming soon</option>
+                <option disabled>Oracle — coming soon</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Include</label>
+            <div class="form-check"><input class="form-check-input" type="checkbox" checked disabled /><label class="form-check-label">Web API + Swagger</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" @bind="model.Docker" /><label class="form-check-label">Docker files</label></div>
+            <div class="form-check text-muted"><input class="form-check-input" type="checkbox" disabled /><label class="form-check-label">Web app, Flutter — coming soon</label></div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex align-items-center mb-2">
+    <h2 class="h4 me-auto m-0">Entities <span class="text-muted small">(each becomes a table and a CRUD API)</span></h2>
+    <button class="btn btn-outline-primary" @onclick="AddEntity">+ Add entity</button>
+</div>
+
+@foreach (var e in model.Entities)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex gap-2 align-items-center">
+            <input class="form-control form-control-sm w-auto" value="@e.Name" placeholder="EntityName"
+                   @onchange="ev => Rename(e, ev.Value?.ToString() ?? string.Empty)" />
+            <span class="text-muted small me-auto">API: /api/@Naming.Plural(e.Name).ToLowerInvariant()</span>
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveEntity(e)">Remove entity</button>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm align-middle mb-2">
+                <thead><tr><th>Field</th><th>Type</th><th>Max length</th><th>Required</th><th>Unique</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var f in e.Fields)
+                {
+                    <tr>
+                        <td><input class="form-control form-control-sm" @bind="f.Name" @bind:event="oninput" /></td>
+                        <td>
+                            <select class="form-select form-select-sm" @bind="f.Type">
+                                @foreach (var t in Enum.GetValues<FieldType>()) { <option value="@t">@t</option> }
+                            </select>
+                        </td>
+                        <td style="width:110px"><input class="form-control form-control-sm" type="number" min="1" @bind="f.MaxLength" /></td>
+                        <td><input class="form-check-input" type="checkbox" @bind="f.Required" /></td>
+                        <td><input class="form-check-input" type="checkbox" @bind="f.Unique" /></td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-danger" @onclick="() => e.Fields.Remove(f)">✕</button></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => e.Fields.Add(new FieldModel())">+ Field</button>
+
+            <h3 class="h6 mt-4">Links to other entities</h3>
+            @foreach (var r in e.Relations)
+            {
+                <div class="d-flex gap-2 align-items-center mb-1">
+                    <input class="form-control form-control-sm w-auto" @bind="r.Name" @bind:event="oninput" />
+                    <span>→</span>
+                    <select class="form-select form-select-sm w-auto" @bind="r.TargetEntity">
+                        <option value="">(choose)</option>
+                        @foreach (var other in model.Entities.Where(x => !string.IsNullOrEmpty(x.Name))) { <option value="@other.Name">@other.Name</option> }
+                    </select>
+                    <label class="form-check-label small"><input class="form-check-input" type="checkbox" @bind="r.Required" /> required</label>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => e.Relations.Remove(r)">✕</button>
+                </div>
+            }
+            <button class="btn btn-sm btn-outline-secondary mt-1" @onclick="() => AddRelation(e)">+ Link</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ProjectModel? model;
+    private string? status;
+
+    private IReadOnlyList<string> errors => model is null ? [] : AppDefinitionValidator.Validate(model.ToDefinition());
+
+    protected override void OnParametersSet()
+    {
+        var def = Store.Get(Id);
+        model = def is null ? null : ProjectModel.From(def);
+    }
+
+    private void Save()
+    {
+        if (model is null) return;
+        Store.Save(Id, model.ToDefinition());
+        status = "Saved " + DateTime.Now.ToString("T");
+    }
+
+    private void AddEntity() =>
+        model!.Entities.Add(new EntityModel { Name = "NewEntity" + (model.Entities.Count + 1), Fields = [new FieldModel { Name = "Name", Required = true }] });
+
+    private void RemoveEntity(EntityModel e)
+    {
+        model!.Entities.Remove(e);
+        foreach (var other in model.Entities) other.Relations.RemoveAll(r => r.TargetEntity == e.Name);
+    }
+
+    private void Rename(EntityModel e, string newName)
+    {
+        foreach (var other in model!.Entities)
+            foreach (var r in other.Relations.Where(r => r.TargetEntity == e.Name)) r.TargetEntity = newName;
+        e.Name = newName;
+    }
+
+    private void AddRelation(EntityModel e)
+    {
+        var target = model!.Entities.FirstOrDefault(x => x != e && !string.IsNullOrEmpty(x.Name))?.Name ?? "";
+        e.Relations.Add(new RelationModel { Name = target, TargetEntity = target });
+    }
+}
