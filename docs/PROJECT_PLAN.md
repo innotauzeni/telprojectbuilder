@@ -45,8 +45,16 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 - [x] DB + target selection, validation display
 - [x] Download ZIP (generation history TODO)
 - [x] Live preview: Swagger "Try it out" against an in-memory mock + generated-code viewer
-- [ ] Preview of the generated Angular web UI and Flutter app (API preview done; UI preview TODO)
+- [x] Preview shows the real generated Angular web app (on a demo API) next to Swagger and the generated files; desktop/tablet/phone sizes
+- [ ] Flutter app preview (when that generator exists)
 - [ ] Sign-up/login (ASP.NET Identity), per-user project storage
+
+### Epic D2 – Product polish
+- [x] Modern design system for the Studio and generated apps: light/dark theme, icons, toasts, confirm dialogs, skeleton loaders, responsive layout
+- [x] Dynamic menu (MenuItems table, role-filtered /api/menu, Admin menu editor) as an opt-in feature; browser-tested in Studio preview and generated app
+- [ ] Multi-language UI (i18n) for the Studio and generated apps
+- [ ] Accessibility audit (WCAG 2.2 AA) and keyboard-only pass
+- [ ] Per-entity screen customisation (column choice, grouping, nested menus)
 
 ### Epic E – Templates
 - [x] Enrolment (Student, Guardian, Course, Term, Enrolment, Payment; Fee TODO)

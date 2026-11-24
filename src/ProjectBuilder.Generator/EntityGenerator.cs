@@ -60,6 +60,10 @@ public static class Naming
         _ => "string"
     };
 
+    /// <summary>"DateOfBirth" -> "Date Of Birth".</summary>
+    public static string Humanize(string name) =>
+        System.Text.RegularExpressions.Regex.Replace(name, "(?<=[a-z0-9])(?=[A-Z])", " ");
+
     public static string Plural(string name) =>
         name.EndsWith('y') && name.Length > 1 && !"aeiou".Contains(char.ToLowerInvariant(name[^2])) ? name[..^1] + "ies"
         : name.EndsWith('s') || name.EndsWith("x") || name.EndsWith("ch") || name.EndsWith("sh") ? name + "es"

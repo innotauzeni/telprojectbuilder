@@ -31,6 +31,9 @@ internal static class Tpl
         {{~ for e in Entities ~}}
             public DbSet<{{ e.Name }}> {{ e.Plural }} => Set<{{ e.Name }}>();
         {{~ end ~}}
+        {{~ if DynamicMenu ~}}
+            public DbSet<MenuItem> MenuItems => Set<MenuItem>();
+        {{~ end ~}}
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
             {
@@ -249,12 +252,130 @@ internal static class Tpl
         }
         """;
 
+    public const string MenuItem = """
+        using System.ComponentModel.DataAnnotations;
+
+        namespace {{ Ns }}.Domain;
+
+        /// <summary>One entry of the navigation menu. Stored in the database so admins can change the menu without redeploying.</summary>
+        public class MenuItem
+        {
+            public Guid Id { get; set; }
+            [Required, MaxLength(100)] public string Label { get; set; } = default!;
+            /// <summary>Internal path in the web app, e.g. /e/students.</summary>
+            [Required, MaxLength(200)] public string Route { get; set; } = default!;
+            [MaxLength(50)] public string? Icon { get; set; }
+            public int SortOrder { get; set; }
+            /// <summary>Comma-separated role names allowed to see the entry. Empty = everyone who is logged in.</summary>
+            [MaxLength(200)] public string? Roles { get; set; }
+            public bool IsVisible { get; set; } = true;
+        }
+        """;
+
+    public const string MenuController = """
+        using System.ComponentModel.DataAnnotations;
+        using Microsoft.AspNetCore.Authorization;
+        using Microsoft.AspNetCore.Mvc;
+        using Microsoft.EntityFrameworkCore;
+        using {{ Ns }}.Data;
+        using {{ Ns }}.Domain;
+
+        namespace {{ Ns }}.Controllers;
+
+        public record MenuEntry(string Label, string Route, string? Icon);
+
+        public class MenuItemDto
+        {
+            public Guid Id { get; set; }
+            [Required, MaxLength(100)] public string Label { get; set; } = default!;
+            // Internal paths only: stops javascript: URLs and links to other sites being injected through the menu.
+            [Required, MaxLength(200), RegularExpression(@"^/[A-Za-z0-9/_\-]*$", ErrorMessage = "Route must be an internal path such as /e/students.")]
+            public string Route { get; set; } = default!;
+            [MaxLength(50), RegularExpression(@"^[a-z0-9\-]*$", ErrorMessage = "Icon must be a lowercase icon name such as home.")]
+            public string? Icon { get; set; }
+            public int SortOrder { get; set; }
+            [MaxLength(200), RegularExpression(@"^[A-Za-z, ]*$", ErrorMessage = "Roles must be role names separated by commas.")]
+            public string? Roles { get; set; }
+            public bool IsVisible { get; set; } = true;
+
+            public static MenuItemDto From(MenuItem e) => new()
+            {
+                Id = e.Id, Label = e.Label, Route = e.Route, Icon = e.Icon, SortOrder = e.SortOrder, Roles = e.Roles, IsVisible = e.IsVisible
+            };
+
+            public void ApplyTo(MenuItem e)
+            {
+                e.Label = Label; e.Route = Route; e.Icon = string.IsNullOrWhiteSpace(Icon) ? null : Icon;
+                e.SortOrder = SortOrder; e.Roles = string.IsNullOrWhiteSpace(Roles) ? null : Roles; e.IsVisible = IsVisible;
+            }
+        }
+
+        [ApiController]
+        [Authorize]
+        public class MenuController(AppDbContext db) : ControllerBase
+        {
+            /// <summary>The menu for the current user: visible entries whose Roles include one of the user's roles (or are empty).</summary>
+            [HttpGet("/api/menu")]
+            public async Task<ActionResult<List<MenuEntry>>> Mine()
+            {
+                var roles = User.FindAll("role").Select(c => c.Value).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var items = await db.MenuItems.AsNoTracking().Where(x => x.IsVisible)
+                    .OrderBy(x => x.SortOrder).ThenBy(x => x.Label).ToListAsync();
+                return items
+                    .Where(x => string.IsNullOrWhiteSpace(x.Roles)
+                        || x.Roles.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Any(roles.Contains))
+                    .Select(x => new MenuEntry(x.Label, x.Route, x.Icon)).ToList();
+            }
+
+            [HttpGet("/api/menu-items")]
+            [Authorize(Roles = "Admin")]
+            public async Task<List<MenuItemDto>> All() =>
+                (await db.MenuItems.AsNoTracking().OrderBy(x => x.SortOrder).ThenBy(x => x.Label).ToListAsync())
+                    .Select(MenuItemDto.From).ToList();
+
+            [HttpPost("/api/menu-items")]
+            [Authorize(Roles = "Admin")]
+            public async Task<ActionResult<MenuItemDto>> Create(MenuItemDto dto)
+            {
+                var item = new MenuItem { Id = Guid.NewGuid() };
+                dto.ApplyTo(item);
+                db.MenuItems.Add(item);
+                await db.SaveChangesAsync();
+                return Created($"/api/menu-items/{item.Id}", MenuItemDto.From(item));
+            }
+
+            [HttpPut("/api/menu-items/{id:guid}")]
+            [Authorize(Roles = "Admin")]
+            public async Task<IActionResult> Update(Guid id, MenuItemDto dto)
+            {
+                var item = await db.MenuItems.FindAsync(id);
+                if (item is null) return NotFound();
+                dto.ApplyTo(item);
+                await db.SaveChangesAsync();
+                return NoContent();
+            }
+
+            [HttpDelete("/api/menu-items/{id:guid}")]
+            [Authorize(Roles = "Admin")]
+            public async Task<IActionResult> Delete(Guid id)
+            {
+                var item = await db.MenuItems.FindAsync(id);
+                if (item is null) return NotFound();
+                db.MenuItems.Remove(item);
+                await db.SaveChangesAsync();
+                return NoContent();
+            }
+        }
+        """;
+
     public const string DbSeeder = """
         using Microsoft.AspNetCore.Identity;
+        using Microsoft.EntityFrameworkCore;
+        using {{ Ns }}.Domain;
 
         namespace {{ Ns }}.Data;
 
-        /// <summary>Creates the Admin/User roles and the first admin account (from the Seed section of appsettings).</summary>
+        /// <summary>Creates the Admin/User roles, the first admin account (from the Seed section of appsettings) and the default menu.</summary>
         public static class DbSeeder
         {
             public static async Task SeedAsync(IServiceProvider services, IConfiguration config)
@@ -262,6 +383,18 @@ internal static class Tpl
                 var roles = services.GetRequiredService<RoleManager<IdentityRole>>();
                 foreach (var role in new[] { "Admin", "User" })
                     if (!await roles.RoleExistsAsync(role)) await roles.CreateAsync(new IdentityRole(role));
+        {{~ if DynamicMenu ~}}
+
+                var db = services.GetRequiredService<AppDbContext>();
+                if (!await db.MenuItems.AnyAsync())
+                {
+                    db.MenuItems.AddRange(
+        {{~ for m in MenuItems ~}}
+                        new MenuItem { Id = Guid.NewGuid(), Label = "{{ m.Label }}", Route = "{{ m.Route }}", Icon = "{{ m.Icon }}", SortOrder = {{ m.SortOrder }}, Roles = {{ if m.Roles == "" }}null{{ else }}"{{ m.Roles }}"{{ end }}, IsVisible = true }{{ if for.last }});{{ else }},{{ end }}
+        {{~ end ~}}
+                    await db.SaveChangesAsync();
+                }
+        {{~ end ~}}
 
                 var email = config["Seed:AdminEmail"];
                 var password = config["Seed:AdminPassword"];

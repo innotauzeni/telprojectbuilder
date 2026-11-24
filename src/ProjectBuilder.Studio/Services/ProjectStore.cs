@@ -16,7 +16,9 @@ public sealed class ProjectStore
 
     public ProjectStore(IWebHostEnvironment env)
     {
-        _dir = Path.Combine(env.ContentRootPath, "App_Data", "projects");
+        // STUDIO_DATA_DIR lets tests (and Docker) keep project files somewhere else.
+        var dataRoot = Environment.GetEnvironmentVariable("STUDIO_DATA_DIR") ?? Path.Combine(env.ContentRootPath, "App_Data");
+        _dir = Path.Combine(dataRoot, "projects");
         _templateDir = Path.Combine(AppContext.BaseDirectory, "templates");
         Directory.CreateDirectory(_dir);
     }

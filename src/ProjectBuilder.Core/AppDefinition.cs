@@ -53,6 +53,12 @@ public sealed class AppDefinition
     public Targets Targets { get; init; } = Targets.WebApi | Targets.Docker;
     public List<EntityDefinition> Entities { get; init; } = [];
 
+    /// <summary>
+    /// When true the generated system stores its navigation menu in a database table (MenuItems),
+    /// serves it per role at GET /api/menu and lets admins edit it, so the menu can change without redeploying.
+    /// </summary>
+    public bool DynamicMenu { get; init; }
+
     /// <summary>C# namespace / project name derived from <see cref="Name"/> (letters and digits only).</summary>
     [JsonIgnore]
     public string Namespace => new string(Name.Where(char.IsAsciiLetterOrDigit).ToArray());

@@ -46,6 +46,8 @@ public static class OpenApiGenerator
             };
         }
 
+        if (app.DynamicMenu) AddMenu(schemas, paths);
+
         var doc = new JsonObject
         {
             ["openapi"] = "3.0.1",
@@ -55,6 +57,60 @@ public static class OpenApiGenerator
             ["components"] = new JsonObject { ["schemas"] = schemas }
         };
         return doc.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>Menu endpoints that exist when the project has a dynamic menu.</summary>
+    private static void AddMenu(JsonObject schemas, JsonObject paths)
+    {
+        schemas["MenuItem"] = new JsonObject
+        {
+            ["type"] = "object",
+            ["required"] = new JsonArray("label", "route"),
+            ["properties"] = new JsonObject
+            {
+                ["id"] = new JsonObject { ["type"] = "string", ["format"] = "uuid", ["readOnly"] = true },
+                ["label"] = new JsonObject { ["type"] = "string", ["maxLength"] = 100 },
+                ["route"] = new JsonObject { ["type"] = "string", ["maxLength"] = 200, ["example"] = "/e/students" },
+                ["icon"] = new JsonObject { ["type"] = "string", ["nullable"] = true, ["example"] = "home" },
+                ["sortOrder"] = new JsonObject { ["type"] = "integer", ["format"] = "int32" },
+                ["roles"] = new JsonObject { ["type"] = "string", ["nullable"] = true, ["example"] = "Admin" },
+                ["isVisible"] = new JsonObject { ["type"] = "boolean" }
+            }
+        };
+        var item = Ref("MenuItem");
+        var idParam = new JsonObject
+        {
+            ["name"] = "id", ["in"] = "path", ["required"] = true,
+            ["schema"] = new JsonObject { ["type"] = "string", ["format"] = "uuid" }
+        };
+        paths["/api/menu"] = new JsonObject
+        {
+            ["get"] = Op("Menu", "Menu for the current user", null, Response("200", "OK", new JsonObject
+            {
+                ["type"] = "array",
+                ["items"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["label"] = new JsonObject { ["type"] = "string" },
+                        ["route"] = new JsonObject { ["type"] = "string" },
+                        ["icon"] = new JsonObject { ["type"] = "string", ["nullable"] = true }
+                    }
+                }
+            }))
+        };
+        paths["/api/menu-items"] = new JsonObject
+        {
+            ["get"] = Op("Menu", "List all menu items (Admin)", null,
+                Response("200", "OK", new JsonObject { ["type"] = "array", ["items"] = item.DeepClone() })),
+            ["post"] = Op("Menu", "Create a menu item (Admin)", item, Response("201", "Created", item))
+        };
+        paths["/api/menu-items/{id}"] = new JsonObject
+        {
+            ["put"] = Op("Menu", "Update a menu item (Admin)", item, Response("204", "No content", null), idParam),
+            ["delete"] = Op("Menu", "Delete a menu item (Admin)", null, Response("204", "No content", null), idParam)
+        };
     }
 
     private static JsonObject EntitySchema(EntityDefinition e)

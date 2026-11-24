@@ -14,9 +14,11 @@ public class GeneratedWebAppTests
         Assert.Contains(files, f => f.Path == "web/src/app/pages/entity-list.ts");
         Assert.Contains(files, f => f.Path == "docker-compose.yml" && f.Content.Contains("build: ./web"));
 
-        var entities = files.Single(f => f.Path == "web/src/app/entities.ts").Content;
-        Assert.Contains("export const APP_NAME = \"Enrolment System\";", entities);
+        var entities = files.Single(f => f.Path == "web/public/entities.json").Content;
+        Assert.Contains("\"appName\": \"Enrolment System\"", entities);
+        Assert.Contains("\"dynamicMenu\": true", entities);
         Assert.Contains("\"route\": \"students\"", entities);
+        Assert.Contains("\"icon\": \"graduation-cap\"", entities);
         Assert.Contains("\"label\": \"Date Of Birth\"", entities);
         Assert.Contains("\"key\": \"studentId\"", entities);
         Assert.DoesNotContain("__APP_NAME__", string.Concat(files.Where(f => f.Path.StartsWith("web/")).Select(f => f.Content)));

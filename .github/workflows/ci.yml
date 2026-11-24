@@ -19,6 +19,9 @@ jobs:
       - run: dotnet build -c Release
       # Includes tests that generate, build and run real projects (needs NuGet + npm access).
       - run: dotnet test -c Release --no-build
+      - name: Studio browser test (designer, preview, real web app inside the preview)
+        run: npm install --no-audit --no-fund && node studio.mjs
+        working-directory: tests/e2e-web
   e2e-web:
     # Generates the Enrolment system, builds its Angular app and clicks through it in real Chrome.
     runs-on: ubuntu-latest

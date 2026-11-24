@@ -4,9 +4,10 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build",
+    "build": "ng build && node tools/build-preview-app.mjs",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "build:studio": "ng build",
+    "build:preview-app": "node tools/build-preview-app.mjs"
   },
   "private": true,
   "packageManager": "npm@11.9.0",

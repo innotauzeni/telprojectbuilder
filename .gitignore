@@ -487,3 +487,4 @@ src/ProjectBuilder.Studio/wwwroot/*
 !src/ProjectBuilder.Studio/wwwroot/.gitkeep
 node_modules/
 .angular/
+src/studio-web/.cache/

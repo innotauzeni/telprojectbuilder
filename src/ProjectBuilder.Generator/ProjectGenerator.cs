@@ -40,10 +40,16 @@ public sealed class ProjectGenerator
             DecimalFields = e.Fields.Where(f => f.Type == FieldType.Decimal).Select(f => f.Name).ToList()
         }).ToList();
 
-        files.Add(new("Data/AppDbContext.cs", Tpl.Render(Tpl.DbContext, new { Ns = ns, Entities = entities })));
+        files.Add(new("Data/AppDbContext.cs", Tpl.Render(Tpl.DbContext, new { Ns = ns, Entities = entities, app.DynamicMenu })));
         files.Add(new("PagedResult.cs", Tpl.Render(Tpl.PagedResult, new { Ns = ns })));
         files.Add(new("Controllers/AuthController.cs", Tpl.Render(Tpl.AuthController, new { Ns = ns })));
-        files.Add(new("Data/DbSeeder.cs", Tpl.Render(Tpl.DbSeeder, new { Ns = ns })));
+        var menuSeed = app.DynamicMenu ? MenuSeed.Default(app).ToList() : [];
+        files.Add(new("Data/DbSeeder.cs", Tpl.Render(Tpl.DbSeeder, new { Ns = ns, app.DynamicMenu, MenuItems = menuSeed })));
+        if (app.DynamicMenu)
+        {
+            files.Add(new("Domain/MenuItem.cs", Tpl.Render(Tpl.MenuItem, new { Ns = ns })));
+            files.Add(new("Controllers/MenuController.cs", Tpl.Render(Tpl.MenuController, new { Ns = ns })));
+        }
         foreach (var e in entities)
             files.Add(new($"Controllers/{e.Plural}Controller.cs",
                 Tpl.Render(Tpl.Controller, new { Ns = ns, e.Name, e.Plural, Route = e.Plural.ToLowerInvariant() })));

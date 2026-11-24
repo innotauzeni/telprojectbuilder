@@ -13,12 +13,14 @@ export class AuthService {
   private readonly session = signal<LoginResponse | null>(this.restore());
 
   readonly isLoggedIn = computed(() => {
+    if (this.config.preview) return true; // Studio preview: no login
     const s = this.session();
     return !!s && new Date(s.expiresUtc).getTime() > Date.now();
   });
-  readonly isAdmin = computed(() => this.isLoggedIn() && !!this.session()?.roles.includes('Admin'));
-  readonly email = computed(() => this.session()?.email ?? '');
-  readonly token = computed(() => (this.isLoggedIn() ? this.session()!.token : null));
+  readonly isAdmin = computed(() => this.config.preview || (this.isLoggedIn() && !!this.session()?.roles.includes('Admin')));
+  readonly email = computed(() => (this.config.preview ? 'preview@example.com' : this.session()?.email ?? ''));
+  readonly role = computed(() => (this.isAdmin() ? 'Admin' : 'User'));
+  readonly token = computed(() => (this.isLoggedIn() && !this.config.preview ? this.session()!.token : null));
 
   async login(email: string, password: string): Promise<void> {
     const res = await firstValueFrom(

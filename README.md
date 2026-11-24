@@ -5,16 +5,18 @@ Web API with Swagger and JWT login, an **Angular** web app, your choice of datab
 result and deploy it anywhere. The output has no dependency on ProjectBuilder, so you own it completely.
 A Flutter mobile app is on the roadmap.
 
-> **Status: early alpha (Phase 1).** Working today: Studio designer + live preview, Enrolment template, API generation
-> for SQLite / SQL Server / PostgreSQL with login and Admin/User roles, generated Angular web app, ZIP download.
-> Not yet: migrations, per-entity permissions, Flutter app. Do not expose the Studio publicly yet (no accounts).
-> See the [roadmap](docs/ROADMAP.md).
+> **Status: early alpha (Phase 1).** Working today: Studio designer, a live preview of the real web app and API, the
+> Enrolment template, API generation for SQLite / SQL Server / PostgreSQL with login and Admin/User roles, a modern
+> Angular web app (light/dark, responsive), an optional database-driven **dynamic menu**, and ZIP download.
+> Not yet: migrations, per-entity permissions, multi-language UI, Flutter app. Do not expose the Studio publicly yet
+> (no accounts). See the [roadmap](docs/ROADMAP.md).
 
 ## Quick start
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and Node.js 20.19+ / 22.12+ / 24+ (for the Angular Studio).
 
 ```
-# 1. Build the Studio web app (once, and after changing src/studio-web)
+# 1. Build the Studio web app and the web-app preview (once, and after changing src/studio-web or the Angular template;
+#    the first run installs packages and takes a few minutes)
 cd src/studio-web
 npm install
 npm run build
@@ -23,7 +25,11 @@ npm run build
 cd ../..
 dotnet run --project src/ProjectBuilder.Studio --urls http://localhost:5230
 ```
-Open http://localhost:5230 → pick the **Enrolment System** template → tweak → **Preview** (live API + code) → **Download**.
+Open http://localhost:5230 → pick the **Enrolment System** template → tweak → **Preview** (your real web app running on a
+demo API, plus Swagger and the generated code) → **Download**.
+
+**Dynamic menu:** switch it on in the designer and the generated system gets a `MenuItems` table, `GET /api/menu`
+(filtered by the user's roles) and an Admin "Menu" screen to add, reorder, hide or remove entries without redeploying.
 
 Working on the Studio UI itself? Run `dotnet run` as above and, in `src/studio-web`, `npm start`
 (live reload at http://localhost:4200, proxied to the .NET server on port 5230).

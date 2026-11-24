@@ -26,11 +26,29 @@ public static class PreviewApi
 
         app.MapGet("/preview/{id:guid}/swagger", (Guid id) => Results.Content(SwaggerHtml(id), "text/html"));
 
+        MapWebApp(app);
+
+        // Menu for the previewed user (the preview user is an Admin, so every visible entry is shown).
+        app.MapGet("/preview/{id:guid}/api/menu", (Guid id, ProjectStore s) =>
+            With(s, id, MenuRoute, (e, list) =>
+            {
+                lock (list)
+                    return Results.Ok(list
+                        .Where(x => x["isVisible"]?.GetValue<bool>() ?? true)
+                        .OrderBy(x => x["sortOrder"]?.GetValue<int>() ?? 0)
+                        .Select(x => new JsonObject { ["label"] = x["label"]?.DeepClone(), ["route"] = x["route"]?.DeepClone(), ["icon"] = x["icon"]?.DeepClone() })
+                        .ToList());
+            }));
+
         var api = app.MapGroup("/preview/{id:guid}/api/{resource}");
 
         api.MapGet("", (Guid id, string resource, ProjectStore s, int page = 1, int pageSize = 20) =>
             With(s, id, resource, (e, list) =>
             {
+                // Like the real API, the menu editor gets a plain array, not a page.
+                if (ReferenceEquals(e, MenuEntity))
+                    lock (list) return Results.Ok(list.OrderBy(x => x["sortOrder"]?.GetValue<int>() ?? 0).Select(x => (JsonNode)x.DeepClone()).ToArray());
+
                 page = Math.Max(page, 1);
                 pageSize = Math.Clamp(pageSize, 1, 200);
                 JsonObject result;
@@ -95,14 +113,97 @@ public static class PreviewApi
             }));
     }
 
+    private const string MenuRoute = "menu-items";
+
+    /// <summary>The generated "MenuItem" table, so the menu editor works against the mock exactly like the real API.</summary>
+    private static readonly EntityDefinition MenuEntity = new()
+    {
+        Name = "MenuItem",
+        Fields =
+        [
+            new() { Name = "Label", Required = true },
+            new() { Name = "Route", Required = true },
+            new() { Name = "Icon" },
+            new() { Name = "SortOrder", Type = FieldType.Int },
+            new() { Name = "Roles" },
+            new() { Name = "IsVisible", Type = FieldType.Bool }
+        ]
+    };
+
     private static IResult With(ProjectStore store, Guid id, string resource, Func<EntityDefinition, List<JsonObject>, IResult> action)
     {
         var def = store.Get(id);
-        var entity = def?.Entities.FirstOrDefault(e => Naming.Plural(e.Name).Equals(resource, StringComparison.OrdinalIgnoreCase));
-        if (def is null || entity is null) return Results.NotFound();
+        if (def is null) return Results.NotFound();
+
+        if (resource.Equals(MenuRoute, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!def.DynamicMenu) return Results.NotFound();
+            var menu = Data.GetOrAdd($"{id:N}/{MenuEntity.Name}", _ => MenuSeed.Default(def).Select(m => new JsonObject
+            {
+                ["id"] = Guid.NewGuid(), ["label"] = m.Label, ["route"] = m.Route, ["icon"] = m.Icon,
+                ["sortOrder"] = m.SortOrder, ["roles"] = m.Roles == "" ? null : m.Roles, ["isVisible"] = true
+            }).ToList());
+            return action(MenuEntity, menu);
+        }
+
+        var entity = def.Entities.FirstOrDefault(e => Naming.Plural(e.Name).Equals(resource, StringComparison.OrdinalIgnoreCase));
+        if (entity is null) return Results.NotFound();
         var list = Data.GetOrAdd($"{id:N}/{entity.Name}", _ => []);
         return action(entity, list);
     }
+
+    // ---- the real generated Angular web app, served inside the Studio under /preview/{id}/app/ ----
+
+    private static readonly Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider ContentTypes = new();
+
+    private static void MapWebApp(WebApplication app)
+    {
+        var webRoot = app.Environment.WebRootPath ?? "";
+        var previewApp = Path.Combine(webRoot, "preview-app");
+
+        app.MapGet("/preview/{id:guid}/app/config.json", (Guid id) =>
+            Results.Json(new { apiBaseUrl = $"/preview/{id}/api", preview = true }));
+
+        app.MapGet("/preview/{id:guid}/app/entities.json", (Guid id, ProjectStore store) =>
+        {
+            var def = store.Get(id);
+            if (def is null) return Results.NotFound();
+            if (AppDefinitionValidator.Validate(def).Count > 0) return Results.BadRequest(new { errors = AppDefinitionValidator.Validate(def) });
+            return Results.Content(WebAppGenerator.EntitiesJson(def), "application/json");
+        });
+
+        // Everything else: a built file if it exists, otherwise index.html (Angular's router handles the path).
+        app.MapGet("/preview/{id:guid}/app/{**path}", async (Guid id, string? path, HttpContext ctx) =>
+        {
+            var index = Path.Combine(previewApp, "index.html");
+            if (!File.Exists(index))
+                return Results.Content(NotBuiltHtml, "text/html; charset=utf-8", statusCode: 503);
+
+            if (!string.IsNullOrEmpty(path))
+            {
+                var full = Path.GetFullPath(Path.Combine(previewApp, path));
+                // never leave the preview-app folder (path traversal)
+                if (full.StartsWith(Path.GetFullPath(previewApp) + Path.DirectorySeparatorChar, StringComparison.Ordinal) && File.Exists(full))
+                {
+                    ContentTypes.TryGetContentType(full, out var type);
+                    return Results.File(full, type ?? "application/octet-stream");
+                }
+            }
+
+            var html = await File.ReadAllTextAsync(index);
+            return Results.Content(html.Replace("<base href=\"/\">", $"<base href=\"/preview/{id}/app/\">"), "text/html; charset=utf-8");
+        });
+    }
+
+    private const string NotBuiltHtml = """
+        <!doctype html><meta charset="utf-8"><title>Preview not built</title>
+        <body style="font-family:system-ui;max-width:560px;margin:4rem auto;padding:0 1rem;color:#334155">
+        <h2>The web app preview has not been built yet</h2>
+        <p>Run this once in <code>src/studio-web</code>, then refresh:</p>
+        <pre style="background:#f1f5f9;padding:1rem;border-radius:8px">npm install
+        npm run build</pre>
+        </body>
+        """;
 
     private static async Task<JsonObject?> ReadBody(HttpRequest req)
     {

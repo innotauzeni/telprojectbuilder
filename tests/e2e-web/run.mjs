@@ -86,8 +86,8 @@ try {
   const problems = [];
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
-  page.on('dialog', (d) => d.accept()); // confirm("Delete this ...?")
   page.setDefaultTimeout(15000);
+  await page.setViewport({ width: 1366, height: 900 }); // desktop layout (below 900px the sidebar becomes a drawer)
   const base = `http://127.0.0.1:${webPort}`;
 
   const text = async (sel) => page.$eval(sel, (e) => e.textContent ?? '');
@@ -99,6 +99,7 @@ try {
     await clickText('nav a', label);
     await page.waitForFunction((l) => document.querySelector('h1')?.textContent.includes(l), {}, label);
   };
+  const clickLabel = async (label) => { await page.waitForSelector(`[aria-label="${label}"]`); await page.click(`[aria-label="${label}"]`); };
   const clickText = async (selector, label) => {
     const h = await page.evaluateHandle((s, l) => [...document.querySelectorAll(s)].find((e) => e.textContent.trim().includes(l)), selector, label);
     const el = h.asElement();
@@ -121,6 +122,18 @@ try {
   await page.click('button[type=submit]');
   await bodyHas('Students');
   ok('admin can log in and sees the menu');
+  await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Dashboard'))); // menu loads after login
+  const adminMenu = await page.$$eval('nav a', (a) => a.map((x) => x.textContent.trim()));
+  if (!adminMenu.includes('Menu') || !adminMenu.includes('Dashboard')) throw new Error('admin menu incomplete: ' + adminMenu.join(', '));
+  ok('admin sees the database-driven menu incl. the Admin-only Menu entry: ' + adminMenu.join(', '));
+
+  // a second, non-admin user for the role checks at the end
+  const session = await page.evaluate(() => JSON.parse(localStorage.getItem('session')));
+  const reg = await fetch(`http://127.0.0.1:${apiPort}/api/auth/register`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + session.token },
+    body: JSON.stringify({ email: 'clerk@example.com', password: 'Clerk#12345', role: 'User' })
+  });
+  if (reg.status !== 201) throw new Error('could not create the User account: ' + reg.status);
 
   // ---- create a student ----
   await goTo('Students');
@@ -138,7 +151,7 @@ try {
   ok('create student: appears in the list');
 
   // ---- edit it (form must be pre-filled from the server) ----
-  await clickText('a.btn', 'Edit');
+  await clickLabel('Edit');
   await page.waitForSelector('#firstName');
   await page.waitForFunction(() => document.querySelector('#firstName').value === 'Ann');
   const dob = await page.$eval('#dateOfBirth', (e) => e.value);
@@ -179,18 +192,35 @@ try {
   // ---- delete as admin ----
   await goTo('Guardians');
   await bodyHas('Mr Ndlovu');
-  await clickText('button.btn', 'Delete');
+  await clickLabel('Delete');
+  await page.waitForSelector('.dialog');
+  await clickText('.dialog button', 'Delete');
   await bodyHas('No records yet');
   ok('admin can delete a record');
 
   // ---- logout ----
-  await clickText('button.btn', 'Log out');
+  await clickLabel('Log out');
   await page.waitForFunction(() => location.pathname === '/login');
   await page.goto(base + '/e/students', { waitUntil: 'networkidle0' });
   if (!page.url().endsWith('/login')) throw new Error('after logout, protected pages must redirect to /login');
   ok('after logout, protected pages redirect to login');
 
-  const real = problems.filter((p) => !p.includes('401') && !p.includes('409') && !p.includes('400'));
+  // ---- a plain User: smaller menu, no admin screens ----
+  await setValue('#email', 'clerk@example.com');
+  await setValue('#password', 'Clerk#12345');
+  await page.click('button[type=submit]');
+  await page.waitForSelector('nav a');
+  await bodyHas('Students');
+  await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Dashboard')));
+  const clerkMenu = await page.$$eval('nav a', (a) => a.map((x) => x.textContent.trim()));
+  if (clerkMenu.includes('Menu')) throw new Error('a User must not see the Menu entry: ' + clerkMenu.join(', '));
+  ok('a User gets a smaller menu without the Admin-only entry: ' + clerkMenu.join(', '));
+  await page.goto(base + '/admin/menu', { waitUntil: 'networkidle0' });
+  await bodyHas('permission');
+  ok('a User opening the Menu editor is told they lack permission');
+  await clickLabel('Log out');
+
+  const real = problems.filter((p) => !['400', '401', '403', '409'].some((c) => p.includes(c)));
   if (real.length) throw new Error('browser reported errors:\n' + real.join('\n'));
   ok('no unexpected browser console errors');
 

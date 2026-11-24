@@ -93,6 +93,36 @@ public class GeneratedAppEndToEndTests
             Assert.Equal(HttpStatusCode.Forbidden, (await clerk.PostAsJsonAsync("/api/auth/register",
                 new { email = "x@example.com", password = "Xx#123456", role = "Admin" })).StatusCode);
 
+            // 7b. Dynamic menu: stored in the database, filtered by role, editable by admins only
+            var adminMenu = (await http.GetFromJsonAsync<JsonArray>("/api/menu"))!.Select(x => (string)x!["label"]!).ToList();
+            var clerkMenu = (await clerk.GetFromJsonAsync<JsonArray>("/api/menu"))!.Select(x => (string)x!["label"]!).ToList();
+            Assert.Contains("Dashboard", adminMenu);
+            Assert.Contains("Students", adminMenu);
+            Assert.Contains("Menu", adminMenu);          // Admin-only entry
+            Assert.Contains("Students", clerkMenu);
+            Assert.DoesNotContain("Menu", clerkMenu);    // hidden from the User role
+            Assert.Equal(HttpStatusCode.Forbidden, (await clerk.GetAsync("/api/menu-items")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await clerk.PostAsJsonAsync("/api/menu-items",
+                new { label = "X", route = "/x" })).StatusCode);
+
+            // unsafe routes are rejected (no javascript: links or other sites through the menu)
+            Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("/api/menu-items",
+                new { label = "Evil", route = "javascript:alert(1)", sortOrder = 5 })).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await http.PostAsJsonAsync("/api/menu-items",
+                new { label = "Evil", route = "https://evil.example", sortOrder = 5 })).StatusCode);
+
+            var newItem = await http.PostAsJsonAsync("/api/menu-items",
+                new { label = "Reports", route = "/e/students", icon = "chart", sortOrder = 5, roles = "Admin, User", isVisible = true });
+            Assert.Equal(HttpStatusCode.Created, newItem.StatusCode);
+            var newId = (string)(await newItem.Content.ReadFromJsonAsync<JsonNode>())!["id"]!;
+            Assert.Contains("Reports", (await clerk.GetFromJsonAsync<JsonArray>("/api/menu"))!.Select(x => (string)x!["label"]!));
+
+            // hide it again -> disappears for everyone without redeploying
+            Assert.Equal(HttpStatusCode.NoContent, (await http.PutAsJsonAsync($"/api/menu-items/{newId}",
+                new { id = newId, label = "Reports", route = "/e/students", icon = "chart", sortOrder = 5, roles = "Admin, User", isVisible = false })).StatusCode);
+            Assert.DoesNotContain("Reports", (await clerk.GetFromJsonAsync<JsonArray>("/api/menu"))!.Select(x => (string)x!["label"]!));
+            Assert.Equal(HttpStatusCode.NoContent, (await http.DeleteAsync($"/api/menu-items/{newId}")).StatusCode);
+
             // 8. Admin can delete
             Assert.Equal(HttpStatusCode.NoContent, (await http.DeleteAsync($"/api/students/{id}")).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"/api/students/{id}")).StatusCode);

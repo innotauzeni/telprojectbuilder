@@ -16,7 +16,7 @@ public class ProjectGeneratorTests
     {
         var json = File.ReadAllText(TemplatePath("enrolment.json"));
         var app = AppDefinitionSerializer.FromJson(json);
-        return new AppDefinition { Name = app.Name, Database = db, Targets = app.Targets, Entities = app.Entities };
+        return new AppDefinition { Name = app.Name, Database = db, Targets = app.Targets, DynamicMenu = app.DynamicMenu, Entities = app.Entities };
     }
 
     [Fact]

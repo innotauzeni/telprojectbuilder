@@ -4,6 +4,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
 import { routes } from './app.routes';
 import { ConfigService } from './core/config.service';
+import { MetaService } from './core/meta.service';
 import { authInterceptor } from './core/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -11,7 +12,13 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor])),
-    // Loads /config.json (API address) before the app starts, so the same build works in any environment.
-    provideAppInitializer(() => inject(ConfigService).load())
+    // Before the app starts, read config.json (API address) and entities.json (the system description),
+    // so the same build works in any environment.
+    provideAppInitializer(async () => {
+      const config = inject(ConfigService);
+      const meta = inject(MetaService);
+      await config.load();
+      await meta.load();
+    })
   ]
 };
