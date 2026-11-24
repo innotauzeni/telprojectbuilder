@@ -113,6 +113,7 @@ internal static class AcTpl
 
     public const string Infrastructure = """
         using Microsoft.AspNetCore.Authorization;
+        using Microsoft.AspNetCore.Identity;
         using Microsoft.EntityFrameworkCore;
         using Microsoft.Extensions.Caching.Memory;
         using Microsoft.Extensions.Options;
@@ -143,6 +144,29 @@ internal static class AcTpl
                 }
                 return result;
             }
+        }
+
+        /// <summary>
+        /// What the database says about a signed-in user right now: still active, and which roles they hold.
+        /// Checked on every request (cached for a few seconds, and cleared whenever an admin changes a user), so deactivating a user
+        /// or changing their roles takes effect immediately instead of when their token expires.
+        /// </summary>
+        public class UserSessionService(UserManager<IdentityUser> users, IMemoryCache cache)
+        {
+            public sealed record Snapshot(bool Active, string[] Roles);
+
+            private static int _version;
+            public static void Invalidate() => Interlocked.Increment(ref _version);
+
+            public async Task<Snapshot?> GetAsync(string userId) =>
+                await cache.GetOrCreateAsync($"user:{_version}:{userId}", async entry =>
+                {
+                    entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(15);
+                    var user = await users.FindByIdAsync(userId);
+                    if (user is null) return null;
+                    var locked = await users.IsLockedOutAsync(user);
+                    return new Snapshot(!locked, (await users.GetRolesAsync(user)).ToArray());
+                });
         }
 
         /// <summary>[HasPermission("students.create")]: the caller's roles must hold that permission (Admin always passes).</summary>
@@ -246,6 +270,17 @@ internal static class AcTpl
         public record TreeModule(int Id, string Name, string Icon, List<TreeSubmodule> Submodules);
         public record AccessTree(List<TreeModule> Modules, List<TreePermission> Other);
 
+        public record UserDto(string Id, string Email, List<string> Roles, bool Active, bool IsMe);
+        public class NewUserInput
+        {
+            [Required, EmailAddress, MaxLength(200)] public string Email { get; set; } = default!;
+            [Required, MaxLength(100)] public string Password { get; set; } = default!;
+            [MaxLength(20)] public List<string> Roles { get; set; } = [];
+        }
+        public class UserRolesInput { [MaxLength(20)] public List<string> Roles { get; set; } = []; }
+        public class UserStatusInput { public bool Active { get; set; } }
+        public class ResetPasswordInput { [Required, MaxLength(100)] public string NewPassword { get; set; } = default!; }
+
         public record MenuNode(string Label, string? Route, string? Icon, List<MenuNode>? Children);
         public record MyPermissions(bool IsAdmin, List<string> Codes);
 
@@ -255,7 +290,7 @@ internal static class AcTpl
         /// </summary>
         [ApiController]
         [Authorize]
-        public class AccessControlController(AppDbContext db, RoleManager<Role> roles, PermissionService perms) : ControllerBase
+        public class AccessControlController(AppDbContext db, RoleManager<Role> roles, UserManager<IdentityUser> users, PermissionService perms) : ControllerBase
         {
             private static readonly string[] BuiltInRoles = ["Admin", "User"];
             private const string InUse = "That name, slug or access name is already used.";
@@ -632,7 +667,102 @@ internal static class AcTpl
                 return NoContent();
             }
 
+            // =============== users ===============
+
+            [HttpGet("/api/users")]
+            [Authorize(Roles = "Admin")]
+            public async Task<List<UserDto>> Users()
+            {
+                var all = await users.Users.AsNoTracking().OrderBy(u => u.Email).Take(500).ToListAsync();
+                var byUser = (await (from ur in db.UserRoles join r in db.Roles on ur.RoleId equals r.Id select new { ur.UserId, r.Name }).ToListAsync())
+                    .GroupBy(x => x.UserId).ToDictionary(g => g.Key, g => g.Select(x => x.Name!).OrderBy(n => n).ToList());
+                var me = CurrentUserId();
+                return all.Select(u => new UserDto(u.Id, u.Email ?? u.UserName ?? "", byUser.GetValueOrDefault(u.Id) ?? [], IsActive(u), u.Id == me)).ToList();
+            }
+
+            [HttpPost("/api/users")]
+            [Authorize(Roles = "Admin")]
+            public async Task<ActionResult<UserDto>> CreateUser(NewUserInput input)
+            {
+                var wanted = input.Roles.Distinct().ToList();
+                if (!await RolesExist(wanted)) return BadRequest(new { errors = new[] { "One or more roles do not exist." } });
+
+                var user = new IdentityUser { UserName = input.Email.Trim(), Email = input.Email.Trim(), EmailConfirmed = true };
+                var result = await users.CreateAsync(user, input.Password);
+                if (!result.Succeeded) return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+                if (wanted.Count > 0) await users.AddToRolesAsync(user, wanted);
+                UserSessionService.Invalidate();
+                return Created($"/api/users/{user.Id}", new UserDto(user.Id, user.Email!, wanted, true, false));
+            }
+
+            /// <summary>Replaces the roles of a user. Takes effect immediately, even for a user who is signed in.</summary>
+            [HttpPut("/api/users/{id}/roles")]
+            [Authorize(Roles = "Admin")]
+            public async Task<IActionResult> SetUserRoles(string id, UserRolesInput input)
+            {
+                var user = await users.FindByIdAsync(id);
+                if (user is null) return NotFound();
+                var wanted = input.Roles.Distinct().ToList();
+                if (!await RolesExist(wanted)) return BadRequest(new { errors = new[] { "One or more roles do not exist." } });
+
+                var isAdminNow = await users.IsInRoleAsync(user, "Admin");
+                if (isAdminNow && !wanted.Contains("Admin"))
+                {
+                    if (id == CurrentUserId()) return BadRequest(new { errors = new[] { "You cannot remove your own Admin role." } });
+                    if (await ActiveAdminCount(except: id) == 0) return BadRequest(new { errors = new[] { "At least one active Admin is required." } });
+                }
+
+                var current = await users.GetRolesAsync(user);
+                await users.RemoveFromRolesAsync(user, current.Except(wanted));
+                await users.AddToRolesAsync(user, wanted.Except(current));
+                UserSessionService.Invalidate();
+                return NoContent();
+            }
+
+            /// <summary>Deactivates or reactivates an account. A deactivated user is signed out of everything straight away.</summary>
+            [HttpPut("/api/users/{id}/status")]
+            [Authorize(Roles = "Admin")]
+            public async Task<IActionResult> SetUserStatus(string id, UserStatusInput input)
+            {
+                var user = await users.FindByIdAsync(id);
+                if (user is null) return NotFound();
+                if (!input.Active)
+                {
+                    if (id == CurrentUserId()) return BadRequest(new { errors = new[] { "You cannot deactivate your own account." } });
+                    if (await users.IsInRoleAsync(user, "Admin") && await ActiveAdminCount(except: id) == 0)
+                        return BadRequest(new { errors = new[] { "At least one active Admin is required." } });
+                }
+
+                await users.SetLockoutEnabledAsync(user, true);
+                await users.SetLockoutEndDateAsync(user, input.Active ? null : DateTimeOffset.MaxValue);
+                if (input.Active) await users.ResetAccessFailedCountAsync(user);
+                UserSessionService.Invalidate();
+                return NoContent();
+            }
+
+            [HttpPost("/api/users/{id}/password")]
+            [Authorize(Roles = "Admin")]
+            public async Task<IActionResult> ResetPassword(string id, ResetPasswordInput input)
+            {
+                var user = await users.FindByIdAsync(id);
+                if (user is null) return NotFound();
+                var token = await users.GeneratePasswordResetTokenAsync(user);
+                var result = await users.ResetPasswordAsync(user, token, input.NewPassword);
+                return result.Succeeded ? NoContent() : BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+            }
+
             // =============== helpers ===============
+
+            private string? CurrentUserId() => User.FindFirst("sub")?.Value;
+
+            private static bool IsActive(IdentityUser u) => !(u.LockoutEnd is { } end && end > DateTimeOffset.UtcNow);
+
+            private async Task<bool> RolesExist(List<string> names) =>
+                names.Count == 0 || await roles.Roles.CountAsync(r => names.Contains(r.Name!)) == names.Count;
+
+            private async Task<int> ActiveAdminCount(string except) =>
+                (await users.GetUsersInRoleAsync("Admin")).Count(u => u.Id != except && IsActive(u));
+
 
             private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 

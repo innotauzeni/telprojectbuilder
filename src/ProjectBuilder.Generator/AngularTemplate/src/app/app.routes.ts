@@ -13,6 +13,7 @@ import { SubmoduleRolesPage } from './pages/access/submodule-roles';
 import { RolesPage } from './pages/access/roles';
 import { RoleDetailPage } from './pages/access/role-detail';
 import { RoleAssignPage } from './pages/access/role-assign';
+import { UsersPage } from './pages/access/users';
 
 export const routes: Routes = [
   { path: 'login', component: LoginPage },
@@ -33,7 +34,8 @@ export const routes: Routes = [
       { path: 'admin/submodules/:id/role-permission', component: SubmoduleRolesPage, canActivate: [adminGuard] },
       { path: 'admin/roles', component: RolesPage, canActivate: [adminGuard] },
       { path: 'admin/roles/:id', component: RoleDetailPage, canActivate: [adminGuard] },
-      { path: 'admin/roles/:id/assign', component: RoleAssignPage, canActivate: [adminGuard] }
+      { path: 'admin/roles/:id/assign', component: RoleAssignPage, canActivate: [adminGuard] },
+      { path: 'admin/users', component: UsersPage, canActivate: [adminGuard] }
     ]
   },
   { path: '**', redirectTo: '' }

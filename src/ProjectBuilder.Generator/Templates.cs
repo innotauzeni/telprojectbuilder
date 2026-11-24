@@ -234,6 +234,8 @@ internal static class Tpl
             {
                 var user = await users.FindByEmailAsync(request.Email);
                 if (user is null) return Unauthorized();
+                if (user.LockoutEnd == DateTimeOffset.MaxValue)
+                    return Problem("This account has been deactivated. Ask an administrator to reactivate it.", statusCode: StatusCodes.Status403Forbidden);
                 if (await users.IsLockedOutAsync(user))
                     return Problem("Too many failed attempts. Try again later.", statusCode: StatusCodes.Status429TooManyRequests);
                 if (!await users.CheckPasswordAsync(user, request.Password))
@@ -519,12 +521,29 @@ internal static class Tpl
                 o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
             })
             .AddRoles<Role>()
-            .AddEntityFrameworkStores<AppDbContext>();
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddDefaultTokenProviders(); // needed for admin password resets
 
         var jwt = builder.Configuration.GetSection("Jwt");
         builder.Services.AddAuthentication("Bearer").AddJwtBearer(o =>
         {
             o.MapInboundClaims = false;
+        {{~ if AccessControl ~}}
+            // Every request is checked against the database: deactivated users are refused, and role changes apply at once.
+            o.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnTokenValidated = async ctx =>
+                {
+                    var id = ctx.Principal?.FindFirst("sub")?.Value;
+                    var snapshot = id is null ? null : await ctx.HttpContext.RequestServices.GetRequiredService<{{ Ns }}.Security.UserSessionService>().GetAsync(id);
+                    if (snapshot is null || !snapshot.Active) { ctx.Fail("This account is not available."); return; }
+
+                    var identity = (System.Security.Claims.ClaimsIdentity)ctx.Principal!.Identity!;
+                    foreach (var stale in identity.FindAll("role").ToList()) identity.RemoveClaim(stale);
+                    foreach (var role in snapshot.Roles) identity.AddClaim(new System.Security.Claims.Claim("role", role));
+                }
+            };
+        {{~ end ~}}
             o.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true, ValidIssuer = jwt["Issuer"],
@@ -541,6 +560,7 @@ internal static class Tpl
         // Role permissions: [HasPermission("students.create")] is checked against the database (cached for a few seconds).
         builder.Services.AddMemoryCache();
         builder.Services.AddScoped<{{ Ns }}.Security.PermissionService>();
+        builder.Services.AddScoped<{{ Ns }}.Security.UserSessionService>();
         builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationPolicyProvider, {{ Ns }}.Security.PermissionPolicyProvider>();
         builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, {{ Ns }}.Security.PermissionHandler>();
         {{~ end ~}}

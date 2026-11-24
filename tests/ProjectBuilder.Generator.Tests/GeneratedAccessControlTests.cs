@@ -206,6 +206,61 @@ public class GeneratedAccessControlTests
             Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/auth/register",
                 new { email = "x@example.com", password = "Xx#123456", role = "NoSuchRole" })).StatusCode);
 
+            // ---- users: list, add, roles and deactivation apply at once, password reset, guard rails ----
+            var userList = (await admin.GetFromJsonAsync<JsonArray>("/api/users"))!;
+            var adminRow = userList.First(u => (string)u!["email"]! == adminEmail)!;
+            var clerkRow = userList.First(u => (string)u!["email"]! == "clerk@example.com")!;
+            var adminId = (string)adminRow["id"]!;
+            var clerkId = (string)clerkRow["id"]!;
+            Assert.True((bool)adminRow["isMe"]!);
+            Assert.False((bool)clerkRow["isMe"]!);
+            Assert.Contains("Admin", ((JsonArray)adminRow["roles"]!).Select(x => (string)x!));
+            Assert.Equal(HttpStatusCode.Forbidden, (await clerk.GetAsync("/api/users")).StatusCode);
+
+            var hire = await admin.PostAsJsonAsync("/api/users", new { email = "new.hire@example.com", password = "Hire#12345", roles = new[] { "Registrar" } });
+            Assert.Equal(HttpStatusCode.Created, hire.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { email = "new.hire@example.com", password = "Hire#12345", roles = Array.Empty<string>() })).StatusCode);   // duplicate
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { email = "weak@example.com", password = "weak", roles = Array.Empty<string>() })).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync("/api/users", new { email = "ghost@example.com", password = "Ghost#12345", roles = new[] { "NoSuchRole" } })).StatusCode);
+
+            // a role change reaches someone who is already signed in (same token): the User role may read students, Registrar may not
+            Assert.Equal(HttpStatusCode.OK, (await clerk.GetAsync("/api/students")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"/api/users/{clerkId}/roles", new { roles = new[] { "Registrar" } })).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await clerk.GetAsync("/api/students")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"/api/users/{clerkId}/roles", new { roles = new[] { "User" } })).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await clerk.GetAsync("/api/students")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/users/{clerkId}/roles", new { roles = new[] { "NoSuchRole" } })).StatusCode);
+
+            // deactivating signs the user out of everything straight away, and sign-in explains why
+            Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"/api/users/{clerkId}/status", new { active = false })).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await clerk.GetAsync("/api/students")).StatusCode);
+            using (var anon = Client(baseUrl))
+            {
+                var blocked = await anon.PostAsJsonAsync("/api/auth/login", new { email = "clerk@example.com", password = "Clerk#12345" });
+                Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+                Assert.Contains("deactivated", await blocked.Content.ReadAsStringAsync());
+            }
+            Assert.False((bool)(await admin.GetFromJsonAsync<JsonArray>("/api/users"))!.First(u => (string)u!["email"]! == "clerk@example.com")!["active"]!);
+            Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"/api/users/{clerkId}/status", new { active = true })).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await clerk.GetAsync("/api/students")).StatusCode);
+
+            // an admin password reset: the old password stops working, the new one works; weak ones are refused
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync($"/api/users/{clerkId}/password", new { newPassword = "weak" })).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsJsonAsync($"/api/users/{clerkId}/password", new { newPassword = "NewClerk#9876" })).StatusCode);
+            using (var anon = Client(baseUrl))
+            {
+                Assert.Equal(HttpStatusCode.Unauthorized, (await anon.PostAsJsonAsync("/api/auth/login", new { email = "clerk@example.com", password = "Clerk#12345" })).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await anon.PostAsJsonAsync("/api/auth/login", new { email = "clerk@example.com", password = "NewClerk#9876" })).StatusCode);
+            }
+
+            // guard rails: nobody can lock themselves out
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/users/{adminId}/status", new { active = false })).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync($"/api/users/{adminId}/roles", new { roles = new[] { "User" } })).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await admin.PutAsJsonAsync("/api/users/nobody/status", new { active = false })).StatusCode);
+
+            // a role that users hold cannot be deleted until they change role (the new hire is a Registrar)
+            Assert.Equal(HttpStatusCode.Conflict, (await admin.DeleteAsync($"/api/roles/{roleId}")).StatusCode);
+
             // deleting a module removes its sub-modules and permissions
             Assert.Equal(HttpStatusCode.NoContent, (await admin.DeleteAsync($"/api/modules/{reportsModuleId}")).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync($"/api/submodules/{reportsSubId}")).StatusCode);

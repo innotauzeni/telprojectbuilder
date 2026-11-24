@@ -18,6 +18,7 @@ public class GeneratedWebAppTests
         Assert.Contains("\"appName\": \"Enrolment System\"", entities);
         Assert.Contains("\"accessControl\": true", entities);
         Assert.Contains(files, x => x.Path == "web/src/app/pages/access/roles.ts");
+        Assert.Contains(files, x => x.Path == "web/src/app/pages/access/users.ts");
         Assert.Contains(files, x => x.Path == "api/Controllers/AccessControlController.cs");
         Assert.Contains(files, x => x.Path == "api/Domain/AccessControl.cs" && x.Content.Contains("class Submodule") && x.Content.Contains("childrens"));
         Assert.Contains(files, x => x.Path == "api/Domain/Role.cs" && x.Content.Contains("RoleMenus"));

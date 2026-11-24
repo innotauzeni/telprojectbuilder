@@ -17,7 +17,8 @@ public static partial class PreviewAccess
     private sealed class Module { public int Id; public string Name = "", Slugname = "", Icon = "table"; public string? Description, AccessName; public int SortOrder; public bool IsActive = true; }
     private sealed class Sub { public int Id, ModuleId, Order; public string Name = "", Icon = "table", Route = "/", AccessName = ""; public bool IsActive = true; }
     private sealed class Perm { public int Id; public string Name = "", DisplayName = "", Module = ""; public bool IsActive = true; }
-    private sealed class RoleRec { public string Id = Guid.NewGuid().ToString(); public string Name = ""; public string? Type, Level; public bool BuiltIn; public int UserCount; }
+    private sealed class RoleRec { public string Id = Guid.NewGuid().ToString(); public string Name = ""; public string? Type, Level; public bool BuiltIn; }
+    private sealed class UserRec { public string Id = Guid.NewGuid().ToString(); public string Email = ""; public List<string> Roles = []; public bool Active = true; public bool IsMe; }
 
     private sealed class State
     {
@@ -27,6 +28,7 @@ public static partial class PreviewAccess
         public readonly List<Sub> Subs = [];
         public readonly List<Perm> Perms = [];
         public readonly List<RoleRec> Roles = [];
+        public readonly List<UserRec> Users = [];
         public readonly HashSet<(string Role, int Module)> RoleMenus = [];
         public readonly HashSet<(string Role, int Perm)> RolePerms = [];
     }
@@ -46,9 +48,11 @@ public static partial class PreviewAccess
     private static State Seed(AppDefinition def)
     {
         var s = new State();
-        var admin = new RoleRec { Name = "Admin", Type = "System", Level = "Administrator", BuiltIn = true, UserCount = 1 };
+        var admin = new RoleRec { Name = "Admin", Type = "System", Level = "Administrator", BuiltIn = true };
         var user = new RoleRec { Name = "User", Type = "System", Level = "Standard", BuiltIn = true };
         s.Roles.Add(admin); s.Roles.Add(user);
+        s.Users.Add(new UserRec { Email = "preview@example.com", Roles = ["Admin"], IsMe = true });
+        s.Users.Add(new UserRec { Email = "teacher@example.com", Roles = ["User"] });
 
         foreach (var m in AccessControlSeed.Default(def))
         {
@@ -96,7 +100,7 @@ public static partial class PreviewAccess
 
     private static object RoleDto(State s, RoleRec r) => new
     {
-        r.Id, r.Name, r.Type, r.Level, r.BuiltIn, r.UserCount,
+        r.Id, r.Name, r.Type, r.Level, r.BuiltIn, UserCount = s.Users.Count(u => u.Roles.Contains(r.Name)),
         MenuIds = s.RoleMenus.Where(x => x.Role == r.Id).Select(x => x.Module).Order().ToList(),
         PermissionIds = s.RolePerms.Where(x => x.Role == r.Id).Select(x => x.Perm).Order().ToList()
     };
@@ -112,6 +116,10 @@ public static partial class PreviewAccess
     public sealed record MenusInput(List<int>? ModuleIds);
     public sealed record PermsInput(List<int>? PermissionIds);
     public sealed record RolesInput(List<string>? RoleIds);
+    public sealed record NewUserInput(string? Email, string? Password, List<string>? Roles);
+    public sealed record UserRolesInput(List<string>? Roles);
+    public sealed record UserStatusInput(bool Active);
+    public sealed record ResetPasswordInput(string? NewPassword);
 
     private static string? ValidateModule(ModuleInput i) =>
         string.IsNullOrWhiteSpace(i.Name) || i.Name.Length > 100 ? "Name is required (max 100)."
@@ -289,6 +297,62 @@ public static partial class PreviewAccess
             return Results.Ok(new { Modules = modules, Other = other });
         }));
 
+        // ---- users ----
+        static object UserDto(UserRec u) => new { u.Id, u.Email, Roles = u.Roles.Order().ToList(), u.Active, u.IsMe };
+        static bool StrongEnough(string? pw) => pw is { Length: >= 8 } && pw.Any(char.IsUpper) && pw.Any(char.IsLower) && pw.Any(char.IsDigit) && pw.Any(c => !char.IsLetterOrDigit(c));
+        const string PasswordRules = "Passwords need at least 8 characters with upper and lower case letters, a number and a symbol.";
+
+        p.MapGet("/users", (Guid id, ClaimsPrincipal u, ProjectStore st) => Run(st, u, id, s =>
+            Results.Ok(s.Users.OrderBy(x => x.Email).Select(UserDto).ToList())));
+
+        p.MapPost("/users", (Guid id, NewUserInput i, ClaimsPrincipal u, ProjectStore st) => Run(st, u, id, s =>
+        {
+            var email = i.Email?.Trim() ?? "";
+            if (email.Length is 0 or > 200 || !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email)) return Bad("Enter a valid email address.");
+            if (!StrongEnough(i.Password)) return Bad(PasswordRules);
+            if (s.Users.Any(x => x.Email.Equals(email, StringComparison.OrdinalIgnoreCase))) return Bad($"Email '{email}' is already taken.");
+            var wanted = (i.Roles ?? []).Distinct().ToList();
+            if (wanted.Any(r => s.Roles.All(x => x.Name != r))) return Bad("One or more roles do not exist.");
+            if (s.Users.Count >= 200) return Bad("Preview is limited to 200 users.");
+            var user = new UserRec { Email = email, Roles = wanted };
+            s.Users.Add(user);
+            return Results.Created($"/preview/{id}/api/users/{user.Id}", UserDto(user));
+        }));
+
+        p.MapPut("/users/{uid}/roles", (Guid id, string uid, UserRolesInput i, ClaimsPrincipal u, ProjectStore st) => Run(st, u, id, s =>
+        {
+            var user = s.Users.FirstOrDefault(x => x.Id == uid);
+            if (user is null) return Results.NotFound();
+            var wanted = (i.Roles ?? []).Distinct().ToList();
+            if (wanted.Any(r => s.Roles.All(x => x.Name != r))) return Bad("One or more roles do not exist.");
+            if (user.Roles.Contains("Admin") && !wanted.Contains("Admin"))
+            {
+                if (user.IsMe) return Bad("You cannot remove your own Admin role.");
+                if (!s.Users.Any(x => x.Id != uid && x.Active && x.Roles.Contains("Admin"))) return Bad("At least one active Admin is required.");
+            }
+            user.Roles = wanted;
+            return Results.NoContent();
+        }));
+
+        p.MapPut("/users/{uid}/status", (Guid id, string uid, UserStatusInput i, ClaimsPrincipal u, ProjectStore st) => Run(st, u, id, s =>
+        {
+            var user = s.Users.FirstOrDefault(x => x.Id == uid);
+            if (user is null) return Results.NotFound();
+            if (!i.Active)
+            {
+                if (user.IsMe) return Bad("You cannot deactivate your own account.");
+                if (user.Roles.Contains("Admin") && !s.Users.Any(x => x.Id != uid && x.Active && x.Roles.Contains("Admin"))) return Bad("At least one active Admin is required.");
+            }
+            user.Active = i.Active;
+            return Results.NoContent();
+        }));
+
+        p.MapPost("/users/{uid}/password", (Guid id, string uid, ResetPasswordInput i, ClaimsPrincipal u, ProjectStore st) => Run(st, u, id, s =>
+        {
+            if (s.Users.All(x => x.Id != uid)) return Results.NotFound();
+            return StrongEnough(i.NewPassword) ? Results.NoContent() : Bad(PasswordRules);
+        }));
+
         // ---- roles ----
         p.MapGet("/roles", (Guid id, ClaimsPrincipal u, ProjectStore st) => Run(st, u, id, s =>
             Results.Ok(s.Roles.OrderBy(r => r.Name).Select(r => RoleDto(s, r)).ToList())));
@@ -314,6 +378,7 @@ public static partial class PreviewAccess
             if (name.Length is 0 or > 50 || !RoleNameRx().IsMatch(name)) return Bad("Role names use letters and spaces.");
             if (r.BuiltIn && name != r.Name) return Bad("The built-in roles cannot be renamed.");
             if (s.Roles.Any(x => x.Id != rid && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) return Bad($"Role name '{name}' is already taken.");
+            foreach (var u in s.Users) { var at = u.Roles.IndexOf(r.Name); if (at >= 0) u.Roles[at] = name; } // users keep the renamed role
             r.Name = name; r.Type = Clean(i.Type); r.Level = Clean(i.Level);
             return Results.NoContent();
         }));
@@ -323,6 +388,7 @@ public static partial class PreviewAccess
             var r = s.Roles.FirstOrDefault(x => x.Id == rid);
             if (r is null) return Results.NotFound();
             if (r.BuiltIn) return Bad("The built-in roles cannot be deleted.");
+            if (s.Users.Any(u => u.Roles.Contains(r.Name))) return Conflict("Users still have this role. Change their role first.");
             s.Roles.Remove(r); s.RoleMenus.RemoveWhere(x => x.Role == rid); s.RolePerms.RemoveWhere(x => x.Role == rid);
             return Results.NoContent();
         }));

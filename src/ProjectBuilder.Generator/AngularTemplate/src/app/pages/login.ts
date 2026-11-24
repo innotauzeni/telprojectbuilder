@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { MetaService } from '../core/meta.service';
@@ -70,8 +71,10 @@ export class LoginPage {
     try {
       await this.auth.login(this.email, this.password);
       await this.router.navigateByUrl('/');
-    } catch {
-      this.error.set('Invalid email or password.');
+    } catch (e) {
+      // 403 = deactivated account, 429 = temporarily locked: the server explains which. Anything else stays generic.
+      this.error.set(e instanceof HttpErrorResponse && (e.status === 403 || e.status === 429) && e.error?.detail
+        ? e.error.detail : 'Invalid email or password.');
     } finally {
       this.busy.set(false);
     }

@@ -274,7 +274,9 @@ public sealed class ProjectGenerator
             sb.AppendLine("- A **permission** is named like `students.create`. Add several to a sub-module at once with *Add permissions in bulk*. Every entity starts with View, Create, Edit and Delete.");
             sb.AppendLine("- **Roles** hold the permissions. *Menu permission* decides which menus a role sees; *Role permission* decides what it may do. Both can be assigned together on a role's assign page.");
             sb.AppendLine("- The API enforces the permissions (`[HasPermission(\"students.delete\")]`), and the menu is built from the modules assigned to the user's roles. Admin can always do everything.");
-            sb.AppendLine("- The built-in **User** role starts with every permission except Delete. Give a user a role when you register them: `POST /api/auth/register` with the role name.");
+            sb.AppendLine("- The built-in **User** role starts with every permission except Delete.");
+            sb.AppendLine("- **Users** (Administration > Users): add users with roles, change roles, reset passwords, deactivate or reactivate accounts. Changes apply immediately, even to people who are signed in: the API re-checks every request against the database.");
+            sb.AppendLine("- Guard rails: you cannot deactivate yourself or remove your own Admin role, and the last active Admin cannot be removed.");
             sb.AppendLine();
         }
         sb.AppendLine("## Entities");

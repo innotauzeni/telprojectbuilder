@@ -33,7 +33,9 @@ demo API, plus Swagger and the generated code) → **Download**.
 (the menu), **sub-modules** (the submenu), **permissions** (like `students.create`), **roles** (with a Type and Level),
 **role menus** and **role permissions**. The web app gets Administration screens where tables have *View details*,
 *Menu permission* and *Role permission* actions, permissions can be added in bulk, and a role's menus and permissions are
-assigned on one page. The API enforces the permissions and each user's menu comes from the modules assigned to their roles.
+assigned on one page, and a Users screen adds people, changes their roles, resets passwords and deactivates accounts.
+The API enforces the permissions and each user's menu comes from the modules assigned to their roles; role changes and
+deactivation take effect immediately, even for people who are signed in.
 
 **Dynamic menu:** a lighter option (without roles and permissions): a `MenuItems` table, `GET /api/menu` filtered by the
 user's roles, and an Admin "Menu" screen to add, reorder, hide or remove entries without redeploying.

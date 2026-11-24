@@ -57,7 +57,8 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 - [x] Modern design system for the Studio and generated apps: light/dark theme, icons, toasts, confirm dialogs, skeleton loaders, responsive layout
 - [x] Dynamic menu (MenuItems table, role-filtered /api/menu, Admin menu editor) as an opt-in feature; browser-tested in Studio preview and generated app
 - [x] Access control (opt-in): SystemModule / Submodule / Permission / Role (Type, Level) / RoleMenu / RolePermission tables, admin API and screens (modules, sub-modules, bulk permissions, roles, menu-permission and role-permission assignment), permission-enforcing API, role-filtered menu, read-only screens without Edit permission — API-tested and browser-tested (generated app and Studio preview)
-- [ ] Assign roles to existing users (user management screen); today a role is chosen when a user is registered
+- [x] Users screen: add users with roles, change roles, reset password, deactivate/reactivate; role changes and deactivation apply immediately to signed-in users; guard rails against self lock-out — API-tested and browser-tested
+- [ ] Email invitations and "forgot password" for generated systems (needs an email provider setting)
 - [ ] Row-level / per-field permissions
 - [ ] Multi-language UI (i18n) for the Studio and generated apps
 - [ ] Accessibility audit (WCAG 2.2 AA) and keyboard-only pass

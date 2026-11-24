@@ -38,7 +38,8 @@ public static class AccessControlSeed
             new SeedModule("Administration", "administration", "shield", 900, false,
             [
                 new SeedSubModule("Modules", "modules", "/admin/modules", "layout", 10, []),
-                new SeedSubModule("Roles", "roles", "/admin/roles", "users", 20, [])
+                new SeedSubModule("Roles", "roles", "/admin/roles", "shield", 20, []),
+                new SeedSubModule("Users", "users", "/admin/users", "users", 30, [])
             ])
         ];
     }

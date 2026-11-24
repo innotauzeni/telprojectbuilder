@@ -20,6 +20,7 @@ export interface RoleDto {
   id: string; name: string; type?: string | null; level?: string | null; builtIn: boolean; userCount: number; menuIds: number[]; permissionIds: number[];
 }
 export interface RoleInput { name: string; type: string; level: string; }
+export interface UserDto { id: string; email: string; roles: string[]; active: boolean; isMe: boolean; }
 export interface TreePermission { id: number; name: string; displayName: string; }
 export interface TreeSubmodule { id: number; name: string; route: string; accessName: string; permissions: TreePermission[]; }
 export interface TreeModule { id: number; name: string; icon: string; submodules: TreeSubmodule[]; }
@@ -57,6 +58,13 @@ export class AccessService {
   updatePermission(id: number, p: { name: string; displayName: string; isActive: boolean }) { return firstValueFrom(this.http.put<void>(this.u(`/permissions/${id}`), p)); }
   deletePermission(id: number) { return firstValueFrom(this.http.delete<void>(this.u(`/permissions/${id}`))); }
   tree() { return firstValueFrom(this.http.get<AccessTree>(this.u('/access-tree'))); }
+
+  // users
+  users() { return firstValueFrom(this.http.get<UserDto[]>(this.u('/users'))); }
+  createUser(u: { email: string; password: string; roles: string[] }) { return firstValueFrom(this.http.post<UserDto>(this.u('/users'), u)); }
+  setUserRoles(id: string, roles: string[]) { return firstValueFrom(this.http.put<void>(this.u(`/users/${id}/roles`), { roles })); }
+  setUserStatus(id: string, active: boolean) { return firstValueFrom(this.http.put<void>(this.u(`/users/${id}/status`), { active })); }
+  resetPassword(id: string, newPassword: string) { return firstValueFrom(this.http.post<void>(this.u(`/users/${id}/password`), { newPassword })); }
 
   // roles
   roles() { return firstValueFrom(this.http.get<RoleDto[]>(this.u('/roles'))); }

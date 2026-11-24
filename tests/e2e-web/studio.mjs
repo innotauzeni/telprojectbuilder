@@ -201,6 +201,16 @@ try {
   await frame.waitForFunction(() => [...document.querySelectorAll('.toast')].some((t) => t.innerText.includes('Menus and permissions saved')));
   ok('created a role and assigned a menu and a permission on one page');
 
+  await clickText(frame, 'nav a', 'Users');
+  await heading('Users');
+  await frame.waitForFunction(() => [...document.querySelectorAll('tbody tr')].some((t) => t.textContent.includes('teacher@example.com')));
+  await bodyHas(frame, 'preview@example.com');
+  await rowAction('teacher@example.com', 'Deactivate');
+  await frame.waitForSelector('.dialog');
+  await clickText(frame, '.dialog button', 'Deactivate');
+  await frame.waitForFunction(() => [...document.querySelectorAll('tbody tr')].some((t) => t.textContent.includes('teacher@example.com') && t.textContent.includes('Deactivated')));
+  ok('Users screen in the preview: listed users, deactivated one');
+
   // ---- other preview tabs + device switch ----
   await clickText(page, '.seg button', 'Files');
   await bodyHas(page, 'api/Controllers/StudentsController.cs');

@@ -271,6 +271,45 @@ try {
   });
   if (regRes.status !== 201) throw new Error('could not create the Registrar user: ' + regRes.status);
 
+  // ---- users: deactivate (sign-in explains why), reactivate, add a user, change roles ----
+  await goTo('Users');
+  const userRow = (email, extra = '') => page.waitForFunction((e, x) => [...document.querySelectorAll('tbody tr')].some((t) => t.textContent.includes(e) && t.textContent.includes(x)), {}, email, extra);
+  await userRow('registrar@example.com', 'Active');
+  await rowAction('registrar@example.com', 'Deactivate');
+  await page.waitForSelector('.dialog');
+  await clickText('.dialog button', 'Deactivate');
+  await userRow('registrar@example.com', 'Deactivated');
+  ok('deactivated a user from the Users table');
+
+  const other = await browser.createBrowserContext(); // a second, signed-out browser
+  const p2 = await other.newPage();
+  await p2.setViewport({ width: 1366, height: 900 });
+  await p2.goto(base + '/login', { waitUntil: 'networkidle0' });
+  await p2.type('#email', 'registrar@example.com');
+  await p2.type('#password', 'Regist#12345');
+  await p2.click('button[type=submit]');
+  await p2.waitForFunction(() => document.body.innerText.includes('deactivated'));
+  await other.close();
+  ok('a deactivated user is told at sign-in that the account is deactivated');
+
+  await rowAction('registrar@example.com', 'Activate');
+  await userRow('registrar@example.com', 'Active');
+  await page.waitForFunction(() => ![...document.querySelectorAll('tbody tr')].some((t) => t.textContent.includes('registrar@example.com') && t.textContent.includes('Deactivated')));
+  ok('reactivated the user');
+
+  await clickText('button.btn.primary', 'Add user');
+  await page.waitForSelector('#u-email');
+  await setValue('#u-email', 'intern@example.com');
+  await setValue('#u-pass', 'Intern#12345');
+  await clickText('.dialog button', 'Save');
+  await userRow('intern@example.com', 'User');
+  await rowAction('intern@example.com', 'Roles');
+  await page.waitForSelector('.dialog .check');
+  await clickText('.dialog label.check', 'Registrar');
+  await clickText('.dialog button', 'Save');
+  await userRow('intern@example.com', 'Registrar');
+  ok('added a user and gave them the Registrar role');
+
   // ---- logout ----
   await clickLabel('Log out');
   await page.waitForFunction(() => location.pathname === '/login');

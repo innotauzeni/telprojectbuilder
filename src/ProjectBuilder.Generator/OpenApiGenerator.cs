@@ -92,7 +92,12 @@ public static class OpenApiGenerator
             ("/api/roles/{id}", "put", "Roles", "Update a role (Admin)", true),
             ("/api/roles/{id}", "delete", "Roles", "Delete a role (Admin)", false),
             ("/api/roles/{id}/menus", "put", "Roles", "Menu permission: set the menus of a role (Admin)", true),
-            ("/api/roles/{id}/permissions", "put", "Roles", "Role permission: set the permissions of a role (Admin)", true)
+            ("/api/roles/{id}/permissions", "put", "Roles", "Role permission: set the permissions of a role (Admin)", true),
+            ("/api/users", "get", "Users", "List users with their roles (Admin)", false),
+            ("/api/users", "post", "Users", "Add a user with roles (Admin)", true),
+            ("/api/users/{id}/roles", "put", "Users", "Replace a user's roles; applies immediately (Admin)", true),
+            ("/api/users/{id}/status", "put", "Users", "Deactivate or reactivate a user (Admin)", true),
+            ("/api/users/{id}/password", "post", "Users", "Reset a user's password (Admin)", true)
         ];
 
         foreach (var (path, method, tag, summary, body) in ops)
