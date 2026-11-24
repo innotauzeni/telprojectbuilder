@@ -72,6 +72,14 @@ try {
   if (!page.url().includes('/login')) throw new Error('a signed-out visitor should land on /login, got ' + page.url());
   ok('signed-out visitor is redirected to the sign-in page');
 
+  // the language picker is available before signing in
+  await page.select('header app-language-switcher select', 'fr');
+  await bodyHas(page, 'Bon retour');
+  await bodyHas(page, 'Se connecter');
+  await page.select('header app-language-switcher select', 'en');
+  await bodyHas(page, 'Welcome back');
+  ok('the sign-in page can be switched to French and back');
+
   await clickText(page, 'a', 'Create an account');
   await page.waitForFunction(() => location.pathname === '/register');
   const email = 'tester' + Date.now() + '@example.com';
@@ -86,6 +94,19 @@ try {
   await bodyHas(page, 'Build a complete system without writing code');
   await bodyHas(page, email);
   ok('account created: lands on the projects page with the email shown in the header');
+
+  // languages: Spanish on the home page, remembered after a reload, then English again for the rest of the test
+  await page.select('header app-language-switcher select', 'es');
+  await bodyHas(page, 'Cree un sistema completo sin escribir código');
+  await bodyHas(page, 'Sus proyectos');
+  await page.reload({ waitUntil: 'networkidle0' });
+  await bodyHas(page, 'Cree un sistema completo sin escribir código');
+  if ((await page.evaluate(() => document.documentElement.lang)) !== 'es') throw new Error('html lang should be es after reload');
+  await page.select('header app-language-switcher select', 'sw');
+  await bodyHas(page, 'Unda mfumo kamili bila kuandika msimbo');
+  await page.select('header app-language-switcher select', 'en');
+  await bodyHas(page, 'Build a complete system without writing code');
+  ok('the Studio speaks Spanish and Swahili, remembers the choice after a reload, and switches back to English');
 
   // ---- home ----
   await page.goto(base + '/', { waitUntil: 'networkidle0' });

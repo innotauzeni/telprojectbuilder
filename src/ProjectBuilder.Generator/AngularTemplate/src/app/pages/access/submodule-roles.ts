@@ -4,45 +4,46 @@ import { AccessService, PermissionDto, RoleDto, SubmoduleDto } from '../../core/
 import { ApiService } from '../../core/api.service';
 import { ToastService } from '../../core/toast.service';
 import { Icon } from '../../ui/icon';
+import { T } from '../../ui/t.pipe';
 
 /** "Role permission" for one sub-module: a grid of roles and this sub-module's permissions. */
 @Component({
   selector: 'app-submodule-roles',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, T],
   template: `
     <div class="page">
       <div class="page-header">
         <div class="titles">
-          <span class="crumbs"><a routerLink="/admin/modules">System modules</a> /
-            <a [routerLink]="['/admin/modules', sub()?.moduleId]">Module</a> /
-            <a [routerLink]="['/admin/submodules', subId()]">{{ sub()?.name }}</a> / Role permission</span>
-          <h1>Role permission: {{ sub()?.name }}</h1>
-          <span class="muted small">Tick what each role may do. Admin can always do everything.</span>
+          <span class="crumbs"><a routerLink="/admin/modules">{{ 'System modules' | t }}</a> /
+            <a [routerLink]="['/admin/modules', sub()?.moduleId]">{{ 'Module' | t }}</a> /
+            <a [routerLink]="['/admin/submodules', subId()]">{{ sub()?.name | t }}</a> / {{ 'Role permission' | t }}</span>
+          <h1>{{ 'Role permission: {0}' | t: [(sub()?.name | t)] }}</h1>
+          <span class="muted small">{{ 'Tick what each role may do. Admin can always do everything.' | t }}</span>
         </div>
       </div>
 
-      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() }}</div> }
+      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() | t }}</div> }
 
       @if (!loading() && permissions().length === 0) {
-        <div class="card empty"><div class="ico"><app-icon name="key" [size]="26" /></div><h3>No permissions on this sub-module</h3>
-          <p>Add some first, then come back to give them to roles.</p>
-          <a class="btn primary" [routerLink]="['/admin/submodules', subId()]">Add permissions</a></div>
+        <div class="card empty"><div class="ico"><app-icon name="key" [size]="26" /></div><h3>{{ 'No permissions on this sub-module' | t }}</h3>
+          <p>{{ 'Add some first, then come back to give them to roles.' | t }}</p>
+          <a class="btn primary" [routerLink]="['/admin/submodules', subId()]">{{ 'Add permissions' | t }}</a></div>
       } @else {
         <div class="card table-card">
           <div class="table-scroll">
             <table class="data matrix">
               <thead>
                 <tr>
-                  <th>Role</th>
-                  @for (p of permissions(); track p.id) { <th [title]="p.name">{{ p.displayName }}</th> }
-                  <th>All</th>
+                  <th>{{ 'Role' | t }}</th>
+                  @for (p of permissions(); track p.id) { <th [title]="p.name">{{ p.displayName | t }}</th> }
+                  <th>{{ 'All' | t }}</th>
                 </tr>
               </thead>
               <tbody>
                 @if (loading()) { <tr><td [attr.colspan]="permissions().length + 2"><div class="skeleton" style="height:1.1rem"></div></td></tr> }
                 @for (r of roles(); track r.id) {
                   <tr>
-                    <td style="font-weight:600">{{ r.name }} @if (r.name === 'Admin') { <span class="badge primary">always</span> }</td>
+                    <td style="font-weight:600">{{ r.name }} @if (r.name === 'Admin') { <span class="badge primary">{{ 'always' | t }}</span> }</td>
                     @for (p of permissions(); track p.id) {
                       <td><input type="checkbox" [checked]="r.name === 'Admin' || has(r.id, p.id)" [disabled]="r.name === 'Admin'"
                                  (change)="toggle(r.id, p.id)" [attr.aria-label]="r.name + ': ' + p.displayName" /></td>
@@ -56,8 +57,8 @@ import { Icon } from '../../ui/icon';
           </div>
         </div>
         <div class="sticky-bar">
-          <a class="btn" [routerLink]="['/admin/modules', sub()?.moduleId]">Back</a>
-          <button class="btn primary" (click)="save()" [disabled]="busy() || loading()"><app-icon name="check" [size]="16" /> {{ busy() ? 'Saving…' : 'Save' }}</button>
+          <a class="btn" [routerLink]="['/admin/modules', sub()?.moduleId]">{{ 'Back' | t }}</a>
+          <button class="btn primary" (click)="save()" [disabled]="busy() || loading()"><app-icon name="check" [size]="16" /> {{ (busy() ? 'Saving…' : 'Save') | t }}</button>
         </div>
       }
     </div>
@@ -131,7 +132,7 @@ export class SubmoduleRolesPage {
         this.original[r.id] = this.key(now);
         changed++;
       }
-      this.toast.success(changed ? `Saved ${changed} role(s).` : 'Nothing to save.');
+      this.toast.success(changed ? 'Saved {0} role(s).' : 'Nothing to save.', [changed]);
     } catch (e) {
       this.toast.error(ApiService.message(e));
     } finally {

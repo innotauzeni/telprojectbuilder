@@ -3,56 +3,57 @@ import { RouterLink } from '@angular/router';
 import { AccessService, AccessTree, RoleDto } from '../../core/access.service';
 import { ApiService } from '../../core/api.service';
 import { Icon } from '../../ui/icon';
+import { T } from '../../ui/t.pipe';
 
 interface Group { module: string; items: { name: string; displayName: string }[]; }
 
 /** Read-only summary of a role: its menus and permissions. */
 @Component({
   selector: 'app-role-detail',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, T],
   template: `
     <div class="page" style="max-width:960px">
       <div class="page-header">
         <div class="titles">
-          <span class="crumbs"><a routerLink="/admin/roles">Roles</a> / {{ role()?.name }}</span>
-          <h1>{{ role()?.name }} @if (role()?.builtIn) { <span class="badge primary" style="vertical-align:middle">built-in</span> }</h1>
+          <span class="crumbs"><a routerLink="/admin/roles">{{ 'Roles' | t }}</a> / {{ role()?.name }}</span>
+          <h1>{{ role()?.name }} @if (role()?.builtIn) { <span class="badge primary" style="vertical-align:middle">{{ 'built-in' | t }}</span> }</h1>
         </div>
         <span class="spacer"></span>
         @if (role(); as r) {
-          <a class="btn" [routerLink]="['/admin/roles', r.id, 'assign']" [queryParams]="{ focus: 'menus' }"><app-icon name="list" [size]="16" /> Menu permission</a>
-          <a class="btn primary" [routerLink]="['/admin/roles', r.id, 'assign']" [queryParams]="{ focus: 'permissions' }"><app-icon name="key" [size]="16" /> Role permission</a>
+          <a class="btn" [routerLink]="['/admin/roles', r.id, 'assign']" [queryParams]="{ focus: 'menus' }"><app-icon name="list" [size]="16" /> {{ 'Menu permission' | t }}</a>
+          <a class="btn primary" [routerLink]="['/admin/roles', r.id, 'assign']" [queryParams]="{ focus: 'permissions' }"><app-icon name="key" [size]="16" /> {{ 'Role permission' | t }}</a>
         }
       </div>
 
-      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() }}</div> }
+      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() | t }}</div> }
 
       @if (role(); as r) {
         <div class="card" style="margin-bottom:1rem">
           <div class="row" style="gap:2rem">
-            <div><div class="muted small">Type</div><div>{{ r.type || '—' }}</div></div>
-            <div><div class="muted small">Level</div><div>{{ r.level || '—' }}</div></div>
-            <div><div class="muted small">Users with this role</div><div>{{ r.userCount }}</div></div>
+            <div><div class="muted small">{{ 'Type' | t }}</div><div>{{ r.type || '—' }}</div></div>
+            <div><div class="muted small">{{ 'Level' | t }}</div><div>{{ r.level || '—' }}</div></div>
+            <div><div class="muted small">{{ 'Users with this role' | t }}</div><div>{{ r.userCount }}</div></div>
           </div>
         </div>
 
         @if (r.name === 'Admin') {
-          <div class="alert info"><app-icon name="shield" /> Admin always sees every menu and can do everything, so nothing is assigned to it.</div>
+          <div class="alert info"><app-icon name="shield" /> {{ 'Admin always sees every menu and can do everything, so nothing is assigned to it.' | t }}</div>
         } @else {
           <div class="grid" style="grid-template-columns: 1fr 2fr; align-items:start">
             <div class="card">
-              <h2 style="margin-bottom:.75rem">Menus <span class="badge">{{ menus().length }}</span></h2>
+              <h2 style="margin-bottom:.75rem">{{ 'Menus' | t }} <span class="badge">{{ menus().length }}</span></h2>
               @for (m of menus(); track m) { <div class="row" style="padding:.25rem 0"><app-icon name="check" [size]="14" /> {{ m }}</div> }
-              @empty { <span class="muted small">No menus yet.</span> }
+              @empty { <span class="muted small">{{ 'No menus yet.' | t }}</span> }
             </div>
             <div class="card">
-              <h2 style="margin-bottom:.75rem">Permissions <span class="badge">{{ r.permissionIds.length }}</span></h2>
+              <h2 style="margin-bottom:.75rem">{{ 'Permissions' | t }} <span class="badge">{{ r.permissionIds.length }}</span></h2>
               @for (g of groups(); track g.module) {
                 <div style="margin-bottom:.9rem">
                   <div class="muted small" style="font-weight:650; margin-bottom:.3rem">{{ g.module }}</div>
-                  <div class="row">@for (p of g.items; track p.name) { <span class="chip" [title]="p.name">{{ p.displayName }}</span> }</div>
+                  <div class="row">@for (p of g.items; track p.name) { <span class="chip" [title]="p.name">{{ p.displayName | t }}</span> }</div>
                 </div>
               }
-              @empty { <span class="muted small">No permissions yet.</span> }
+              @empty { <span class="muted small">{{ 'No permissions yet.' | t }}</span> }
             </div>
           </div>
         }

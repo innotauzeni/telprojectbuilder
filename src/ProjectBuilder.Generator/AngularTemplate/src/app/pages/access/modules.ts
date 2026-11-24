@@ -6,30 +6,31 @@ import { ApiService } from '../../core/api.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { ICON_NAMES, Icon } from '../../ui/icon';
+import { T } from '../../ui/t.pipe';
 
 interface ModuleForm extends ModuleInput { id?: number; }
 
 /** System modules = the main menu. Each row can be opened (its sub-modules), given to roles (menu permission), edited or deleted. */
 @Component({
   selector: 'app-modules',
-  imports: [FormsModule, RouterLink, Icon],
+  imports: [FormsModule, RouterLink, Icon, T],
   template: `
     <div class="page">
       <div class="page-header">
         <div class="titles">
-          <h1>System modules</h1>
-          <span class="muted small">The main menu. Open a module to manage its sub-modules (submenu) and their permissions.</span>
+          <h1>{{ 'System modules' | t }}</h1>
+          <span class="muted small">{{ 'The main menu. Open a module to manage its sub-modules (submenu) and their permissions.' | t }}</span>
         </div>
         <span class="spacer"></span>
-        <button class="btn primary" (click)="add()"><app-icon name="plus" [size]="16" /> Add module</button>
+        <button class="btn primary" (click)="add()"><app-icon name="plus" [size]="16" /> {{ 'Add module' | t }}</button>
       </div>
 
-      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() }}</div> }
+      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() | t }}</div> }
 
       <div class="card table-card">
         <div class="table-scroll">
           <table class="data">
-            <thead><tr><th>Module</th><th>Slug</th><th>Sub-modules</th><th>Roles</th><th>Order</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>{{ 'Module' | t }}</th><th>{{ 'Slug' | t }}</th><th>{{ 'Sub-modules' | t }}</th><th>{{ 'Roles' | t }}</th><th>{{ 'Order' | t }}</th><th>{{ 'Status' | t }}</th><th></th></tr></thead>
             <tbody>
               @if (loading()) {
                 @for (i of [1, 2, 3]; track i) { <tr><td colspan="7"><div class="skeleton" style="height:1.1rem"></div></td></tr> }
@@ -39,7 +40,7 @@ interface ModuleForm extends ModuleInput { id?: number; }
                   <td>
                     <div class="row" style="flex-wrap:nowrap">
                       <span class="chip" style="display:inline-grid;place-items:center;width:34px;height:34px;padding:0"><app-icon [name]="m.icon || 'table'" /></span>
-                      <div><a [routerLink]="['/admin/modules', m.id]" style="font-weight:600">{{ m.name }}</a>
+                      <div><a [routerLink]="['/admin/modules', m.id]" style="font-weight:600">{{ m.name | t }}</a>
                         @if (m.description) { <div class="muted small">{{ m.description }}</div> }</div>
                     </div>
                   </td>
@@ -47,13 +48,13 @@ interface ModuleForm extends ModuleInput { id?: number; }
                   <td><span class="badge">{{ m.submoduleCount }}</span></td>
                   <td><span class="badge">{{ m.roleCount }}</span></td>
                   <td>{{ m.sortOrder }}</td>
-                  <td><span class="badge" [class.ok]="m.isActive" [class.no]="!m.isActive">{{ m.isActive ? 'Active' : 'Inactive' }}</span></td>
+                  <td><span class="badge" [class.ok]="m.isActive" [class.no]="!m.isActive">{{ (m.isActive ? 'Active' : 'Inactive') | t }}</span></td>
                   <td class="actions">
                     <div class="actions-wrap">
-                      <a class="btn sm" [routerLink]="['/admin/modules', m.id]"><app-icon name="eye" [size]="14" /> View details</a>
-                      <a class="btn sm" [routerLink]="['/admin/modules', m.id, 'menu-permission']"><app-icon name="list" [size]="14" /> Menu permission</a>
-                      <button class="btn icon ghost" (click)="edit(m)" aria-label="Edit module" title="Edit"><app-icon name="edit" [size]="16" /></button>
-                      <button class="btn icon ghost danger" (click)="remove(m)" aria-label="Delete module" title="Delete"><app-icon name="trash" [size]="16" /></button>
+                      <a class="btn sm" [routerLink]="['/admin/modules', m.id]"><app-icon name="eye" [size]="14" /> {{ 'View details' | t }}</a>
+                      <a class="btn sm" [routerLink]="['/admin/modules', m.id, 'menu-permission']"><app-icon name="list" [size]="14" /> {{ 'Menu permission' | t }}</a>
+                      <button class="btn icon ghost" (click)="edit(m)" [attr.aria-label]="'Edit module' | t" [title]="'Edit' | t"><app-icon name="edit" [size]="16" /></button>
+                      <button class="btn icon ghost danger" (click)="remove(m)" [attr.aria-label]="'Delete module' | t" [title]="'Delete' | t"><app-icon name="trash" [size]="16" /></button>
                     </div>
                   </td>
                 </tr>
@@ -62,35 +63,35 @@ interface ModuleForm extends ModuleInput { id?: number; }
           </table>
         </div>
         @if (!loading() && items().length === 0) {
-          <div class="empty"><div class="ico"><app-icon name="layout" [size]="26" /></div><h3>No modules yet</h3><p>Add the first menu entry.</p></div>
+          <div class="empty"><div class="ico"><app-icon name="layout" [size]="26" /></div><h3>{{ 'No modules yet' | t }}</h3><p>{{ 'Add the first menu entry.' | t }}</p></div>
         }
       </div>
     </div>
 
     @if (form(); as f) {
       <div class="backdrop" (click)="form.set(null)">
-        <form class="dialog wide" (ngSubmit)="save()" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Module">
-          <h2>{{ f.id ? 'Edit module' : 'Add module' }}</h2>
-          @if (formError()) { <div class="alert error" role="alert" style="margin-top:.75rem"><app-icon name="alert" />{{ formError() }}</div> }
+        <form class="dialog wide" (ngSubmit)="save()" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" [attr.aria-label]="'Module' | t">
+          <h2>{{ (f.id ? 'Edit module' : 'Add module') | t }}</h2>
+          @if (formError()) { <div class="alert error" role="alert" style="margin-top:.75rem"><app-icon name="alert" />{{ formError() | t }}</div> }
           <div class="form-grid" style="margin-top:1rem">
-            <div><label class="lbl" for="m-name">Name <span class="req">*</span></label>
+            <div><label class="lbl" for="m-name">{{ 'Name' | t }} <span class="req">*</span></label>
               <input id="m-name" name="name" type="text" [(ngModel)]="f.name" required maxlength="100" (input)="autoSlug(f)" /></div>
-            <div><label class="lbl" for="m-slug">Slug <span class="req">*</span></label>
+            <div><label class="lbl" for="m-slug">{{ 'Slug' | t }} <span class="req">*</span></label>
               <input id="m-slug" name="slug" type="text" [(ngModel)]="f.slugname" required maxlength="100" pattern="[a-z0-9\\-]+" /></div>
-            <div><label class="lbl" for="m-icon">Icon</label>
+            <div><label class="lbl" for="m-icon">{{ 'Icon' | t }}</label>
               <select id="m-icon" name="icon" [(ngModel)]="f.icon">@for (n of icons; track n) { <option [value]="n">{{ n }}</option> }</select></div>
-            <div><label class="lbl" for="m-access">Access name</label>
+            <div><label class="lbl" for="m-access">{{ 'Access name' | t }}</label>
               <input id="m-access" name="access" type="text" [(ngModel)]="f.accessName" maxlength="100" /></div>
-            <div><label class="lbl" for="m-order">Order</label>
+            <div><label class="lbl" for="m-order">{{ 'Order' | t }}</label>
               <input id="m-order" name="order" type="number" [(ngModel)]="f.sortOrder" /></div>
-            <div><label class="lbl">Status</label>
-              <label class="row" style="gap:.6rem;padding:.4rem 0"><input type="checkbox" name="active" [(ngModel)]="f.isActive" /> <span class="muted">Active</span></label></div>
-            <div class="full"><label class="lbl" for="m-desc">Description</label>
+            <div><label class="lbl">{{ 'Status' | t }}</label>
+              <label class="row" style="gap:.6rem;padding:.4rem 0"><input type="checkbox" name="active" [(ngModel)]="f.isActive" /> <span class="muted">{{ 'Active' | t }}</span></label></div>
+            <div class="full"><label class="lbl" for="m-desc">{{ 'Description' | t }}</label>
               <textarea id="m-desc" name="desc" rows="2" [(ngModel)]="f.description" maxlength="500"></textarea></div>
           </div>
           <div class="row" style="justify-content:flex-end;margin-top:1.25rem">
-            <button class="btn" type="button" (click)="form.set(null)">Cancel</button>
-            <button class="btn primary" type="submit" [disabled]="busy()">{{ busy() ? 'Saving…' : 'Save' }}</button>
+            <button class="btn" type="button" (click)="form.set(null)">{{ 'Cancel' | t }}</button>
+            <button class="btn primary" type="submit" [disabled]="busy()">{{ (busy() ? 'Saving…' : 'Save') | t }}</button>
           </div>
         </form>
       </div>
@@ -154,8 +155,8 @@ export class ModulesPage {
   }
 
   protected async remove(m: ModuleDto) {
-    const ok = await this.confirm.ask(`“${m.name}”, its ${m.submoduleCount} sub-module(s) and their menu assignments will be deleted.`,
-      { title: 'Delete module?', confirmText: 'Delete', danger: true });
+    const ok = await this.confirm.ask('“{0}”, its {1} sub-module(s) and their menu assignments will be deleted.',
+      { params: [m.name, m.submoduleCount], title: 'Delete module?', confirmText: 'Delete', danger: true });
     if (!ok) return;
     try { await this.access.deleteModule(m.id); this.toast.success('Module deleted.'); await this.load(); }
     catch (e) { this.toast.error(ApiService.message(e)); }

@@ -4,57 +4,58 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../core/auth.service';
 import { Icon } from '../ui/icon';
+import { T } from '../ui/t.pipe';
 
 /** Sign in / create account (one page, two modes chosen by the route). */
 @Component({
   selector: 'app-account',
-  imports: [FormsModule, RouterLink, Icon],
+  imports: [FormsModule, RouterLink, Icon, T],
   template: `
     <div class="split">
       <section class="brand-panel">
         <span class="logo"><app-icon name="layers" [size]="26" /></span>
-        <h1>ProjectBuilder Studio</h1>
-        <p>Design a complete system, preview it live and download the code. It is all yours.</p>
+        <h1>{{ 'ProjectBuilder Studio' | t }}</h1>
+        <p>{{ 'Design a complete system, preview it live and download the code. It is all yours.' | t }}</p>
         <ul>
-          <li><app-icon name="check" /> C# Web API, Angular web app and Docker files</li>
-          <li><app-icon name="check" /> Your projects stay private to your account</li>
-          <li><app-icon name="check" /> Open source, with no lock-in</li>
+          <li><app-icon name="check" /> {{ 'C# Web API, Angular web app and Docker files' | t }}</li>
+          <li><app-icon name="check" /> {{ 'Your projects stay private to your account' | t }}</li>
+          <li><app-icon name="check" /> {{ 'Open source, with no lock-in' | t }}</li>
         </ul>
       </section>
 
       <section class="form-panel">
         <form class="card" (ngSubmit)="submit()" autocomplete="on">
-          <h2>{{ isRegister() ? 'Create your account' : 'Welcome back' }}</h2>
+          <h2>{{ (isRegister() ? 'Create your account' : 'Welcome back') | t }}</h2>
           <p class="muted" style="margin:.25rem 0 1.25rem">
-            {{ isRegister() ? 'It takes a few seconds.' : 'Sign in to open your projects.' }}
+            {{ (isRegister() ? 'It takes a few seconds.' : 'Sign in to open your projects.') | t }}
           </p>
 
           @if (errors().length) {
             <div class="alert error" role="alert" style="flex-direction:column; gap:.2rem">
-              @for (e of errors(); track $index) { <span>{{ e }}</span> }
+              @for (e of errors(); track $index) { <span>{{ e | t }}</span> }
             </div>
           }
 
           <div style="margin-bottom:1rem">
-            <label class="lbl" for="email">Email</label>
+            <label class="lbl" for="email">{{ 'Email' | t }}</label>
             <input id="email" type="email" name="email" [(ngModel)]="email" required autocomplete="username" placeholder="you@company.com" />
           </div>
           <div style="margin-bottom:1.25rem">
-            <label class="lbl" for="password">Password</label>
+            <label class="lbl" for="password">{{ 'Password' | t }}</label>
             <input id="password" type="password" name="password" [(ngModel)]="password" required
                    [autocomplete]="isRegister() ? 'new-password' : 'current-password'" />
             @if (isRegister()) {
-              <div class="hint">At least 8 characters with upper and lower case letters, a number and a symbol.</div>
+              <div class="hint">{{ 'At least 8 characters with upper and lower case letters, a number and a symbol.' | t }}</div>
             }
           </div>
 
           <button class="btn primary" type="submit" [disabled]="busy()" style="width:100%">
-            {{ busy() ? 'Please wait…' : (isRegister() ? 'Create account' : 'Sign in') }}
+            {{ (busy() ? 'Please wait…' : (isRegister() ? 'Create account' : 'Sign in')) | t }}
           </button>
 
           <p class="small muted" style="text-align:center; margin:1.1rem 0 0">
-            @if (isRegister()) { Already have an account? <a routerLink="/login" [queryParams]="keep()">Sign in</a> }
-            @else { New here? <a routerLink="/register" [queryParams]="keep()">Create an account</a> }
+            @if (isRegister()) { {{ 'Already have an account?' | t }} <a routerLink="/login" [queryParams]="keep()">{{ 'Sign in' | t }}</a> }
+            @else { {{ 'New here?' | t }} <a routerLink="/register" [queryParams]="keep()">{{ 'Create an account' | t }}</a> }
           </p>
         </form>
       </section>

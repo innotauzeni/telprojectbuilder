@@ -4,39 +4,40 @@ import { AccessService, AccessTree, RoleDto, TreePermission } from '../../core/a
 import { ApiService } from '../../core/api.service';
 import { ToastService } from '../../core/toast.service';
 import { Icon } from '../../ui/icon';
+import { T } from '../../ui/t.pipe';
 
 /** Assign menus and permissions to one role, on one page. Both are saved together. */
 @Component({
   selector: 'app-role-assign',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, T],
   template: `
     <div class="page" style="max-width:1000px">
       <div class="page-header">
         <div class="titles">
-          <span class="crumbs"><a routerLink="/admin/roles">Roles</a> / <a [routerLink]="['/admin/roles', id()]">{{ role()?.name }}</a> / Assign</span>
-          <h1>Assign access to “{{ role()?.name }}”</h1>
-          <span class="muted small">Menus decide what shows in the sidebar. Permissions decide what the role may do on each screen.</span>
+          <span class="crumbs"><a routerLink="/admin/roles">{{ 'Roles' | t }}</a> / <a [routerLink]="['/admin/roles', id()]">{{ role()?.name }}</a> / {{ 'Assign' | t }}</span>
+          <h1>{{ 'Assign access to “{0}”' | t: [(role()?.name)] }}</h1>
+          <span class="muted small">{{ 'Menus decide what shows in the sidebar. Permissions decide what the role may do on each screen.' | t }}</span>
         </div>
       </div>
 
-      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() }}</div> }
+      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() | t }}</div> }
 
       @if (role()?.name === 'Admin') {
-        <div class="alert info"><app-icon name="shield" /> Admin always sees every menu and can do everything, so there is nothing to assign.</div>
+        <div class="alert info"><app-icon name="shield" /> {{ 'Admin always sees every menu and can do everything, so there is nothing to assign.' | t }}</div>
       } @else if (tree(); as t) {
         <!-- menus -->
         <div class="card" id="menus" [style.border-color]="focus() === 'menus' ? 'var(--primary)' : ''" style="margin-bottom:1rem">
           <div class="row" style="margin-bottom:.75rem">
-            <h2>Menus <span class="badge">{{ menuIds().size }} of {{ t.modules.length }}</span></h2>
+            <h2>{{ 'Menus' | t }} <span class="badge">{{ '{0} of {1}' | t: [(menuIds().size), (t.modules.length)] }}</span></h2>
             <span class="spacer"></span>
-            <button class="btn sm" (click)="allMenus(true)">Select all</button>
-            <button class="btn sm" (click)="allMenus(false)">Clear</button>
+            <button class="btn sm" (click)="allMenus(true)">{{ 'Select all' | t }}</button>
+            <button class="btn sm" (click)="allMenus(false)">{{ 'Clear' | t }}</button>
           </div>
           <div class="checks">
             @for (m of t.modules; track m.id) {
               <label class="check" [class.on]="menuIds().has(m.id)">
                 <input type="checkbox" [checked]="menuIds().has(m.id)" (change)="toggleMenu(m.id)" />
-                <app-icon [name]="m.icon || 'table'" [size]="15" /> {{ m.name }}
+                <app-icon [name]="m.icon || 'table'" [size]="15" /> {{ m.name | t }}
               </label>
             }
           </div>
@@ -45,45 +46,45 @@ import { Icon } from '../../ui/icon';
         <!-- permissions -->
         <div class="card table-card" id="permissions" [style.border-color]="focus() === 'permissions' ? 'var(--primary)' : ''">
           <div class="row" style="padding:1rem 1.25rem">
-            <h2>Permissions <span class="badge">{{ permIds().size }} selected</span></h2>
+            <h2>{{ 'Permissions' | t }} <span class="badge">{{ '{0} selected' | t: [(permIds().size)] }}</span></h2>
             <span class="spacer"></span>
             <div style="position:relative; width:230px">
               <span style="position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--muted)"><app-icon name="search" [size]="16" /></span>
-              <input type="text" placeholder="Filter permissions…" aria-label="Filter permissions" style="padding-left:2.1rem" (input)="filter.set($any($event.target).value)" />
+              <input type="text" [placeholder]="'Filter permissions…' | t" [attr.aria-label]="'Filter permissions' | t" style="padding-left:2.1rem" (input)="filter.set($any($event.target).value)" />
             </div>
-            <button class="btn sm" (click)="allPerms(true)">Select all</button>
-            <button class="btn sm" (click)="allPerms(false)">Clear</button>
+            <button class="btn sm" (click)="allPerms(true)">{{ 'Select all' | t }}</button>
+            <button class="btn sm" (click)="allPerms(false)">{{ 'Clear' | t }}</button>
           </div>
 
           @for (m of visible(); track m.id) {
             <div class="group-title">
-              <app-icon [name]="m.icon || 'table'" [size]="16" /> {{ m.name }}
+              <app-icon [name]="m.icon || 'table'" [size]="16" /> {{ m.name | t }}
               <span class="spacer"></span>
-              <label class="row small" style="gap:.4rem;font-weight:500"><input type="checkbox" [checked]="moduleAll(m.id)" (change)="toggleGroup(modulePerms(m.id))" /> all</label>
+              <label class="row small" style="gap:.4rem;font-weight:500"><input type="checkbox" [checked]="moduleAll(m.id)" (change)="toggleGroup(modulePerms(m.id))" /> {{ 'all' | t }}</label>
             </div>
             @for (s of m.submodules; track s.id) {
               <div class="row" style="padding:.7rem 1.25rem; border-bottom:1px solid var(--border); align-items:flex-start">
                 <div style="width:200px">
-                  <div style="font-weight:600">{{ s.name }}</div>
-                  <label class="row small muted" style="gap:.4rem;font-weight:500"><input type="checkbox" [checked]="groupAll(s.permissions)" (change)="toggleGroup(s.permissions)" /> all</label>
+                  <div style="font-weight:600">{{ s.name | t }}</div>
+                  <label class="row small muted" style="gap:.4rem;font-weight:500"><input type="checkbox" [checked]="groupAll(s.permissions)" (change)="toggleGroup(s.permissions)" /> {{ 'all' | t }}</label>
                 </div>
                 <div class="checks" style="flex:1">
                   @for (p of s.permissions; track p.id) {
                     <label class="check" [class.on]="permIds().has(p.id)" [title]="p.name">
-                      <input type="checkbox" [checked]="permIds().has(p.id)" (change)="togglePerm(p.id)" /> {{ p.displayName }}
+                      <input type="checkbox" [checked]="permIds().has(p.id)" (change)="togglePerm(p.id)" /> {{ p.displayName | t }}
                     </label>
-                  } @empty { <span class="muted small">No permissions yet. Add some on the sub-module page.</span> }
+                  } @empty { <span class="muted small">{{ 'No permissions yet. Add some on the sub-module page.' | t }}</span> }
                 </div>
               </div>
             }
           }
 
           @if (otherVisible().length) {
-            <div class="group-title"><app-icon name="key" [size]="16" /> Other permissions</div>
+            <div class="group-title"><app-icon name="key" [size]="16" /> {{ 'Other permissions' | t }}</div>
             <div class="checks" style="padding:.8rem 1.25rem">
               @for (p of otherVisible(); track p.id) {
                 <label class="check" [class.on]="permIds().has(p.id)" [title]="p.name">
-                  <input type="checkbox" [checked]="permIds().has(p.id)" (change)="togglePerm(p.id)" /> {{ p.displayName }}
+                  <input type="checkbox" [checked]="permIds().has(p.id)" (change)="togglePerm(p.id)" /> {{ p.displayName | t }}
                 </label>
               }
             </div>
@@ -91,8 +92,8 @@ import { Icon } from '../../ui/icon';
         </div>
 
         <div class="sticky-bar">
-          <a class="btn" routerLink="/admin/roles">Back</a>
-          <button class="btn primary" (click)="save()" [disabled]="busy()"><app-icon name="check" [size]="16" /> {{ busy() ? 'Saving…' : 'Save menus and permissions' }}</button>
+          <a class="btn" routerLink="/admin/roles">{{ 'Back' | t }}</a>
+          <button class="btn primary" (click)="save()" [disabled]="busy()"><app-icon name="check" [size]="16" /> {{ (busy() ? 'Saving…' : 'Save menus and permissions') | t }}</button>
         </div>
       } @else {
         <div class="card"><div class="skeleton" style="height:1.2rem;width:30%;margin-bottom:1rem"></div><div class="skeleton" style="height:8rem"></div></div>

@@ -60,7 +60,7 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 - [x] Users screen: add users with roles, change roles, reset password, deactivate/reactivate; role changes and deactivation apply immediately to signed-in users; guard rails against self lock-out — API-tested and browser-tested
 - [ ] Email invitations and "forgot password" for generated systems (needs an email provider setting)
 - [ ] Row-level / per-field permissions
-- [ ] Multi-language UI (i18n) for the Studio and generated apps
+- [x] Multi-language UI (i18n) for the Studio and generated apps: English, French, Portuguese, Spanish, Swahili, Shona (machine-translated; native review wanted)
 - [ ] Accessibility audit (WCAG 2.2 AA) and keyboard-only pass
 - [ ] Per-entity screen customisation (column choice, grouping, nested menus)
 

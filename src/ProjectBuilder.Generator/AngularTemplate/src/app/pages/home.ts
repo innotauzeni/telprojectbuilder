@@ -4,21 +4,22 @@ import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { MetaService } from '../core/meta.service';
 import { Icon } from '../ui/icon';
+import { T } from '../ui/t.pipe';
 
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, T],
   template: `
     <div class="page">
       <div class="page-header">
         <div class="titles">
-          <h1>Dashboard</h1>
-          <span class="muted">Welcome to {{ meta.appName() }}. Here is an overview of your data.</span>
+          <h1>{{ 'Dashboard' | t }}</h1>
+          <span class="muted">{{ 'Welcome to {0}. Here is an overview of your data.' | t: [(meta.appName())] }}</span>
         </div>
       </div>
 
       @if (meta.entities().length === 0) {
-        <div class="card empty"><h3>No sections yet</h3><p>Add entities in ProjectBuilder to see them here.</p></div>
+        <div class="card empty"><h3>{{ 'No sections yet' | t }}</h3><p>{{ 'Add entities in ProjectBuilder to see them here.' | t }}</p></div>
       } @else {
         <div class="grid">
           @for (e of meta.entities(); track e.name) {
@@ -27,7 +28,7 @@ import { Icon } from '../ui/icon';
               <span>
                 @if (counts()[e.route] === undefined) { <span class="skeleton" style="display:block;width:48px;height:1.6rem"></span> }
                 @else { <span class="num">{{ counts()[e.route] }}</span> }
-                <span class="muted small">{{ e.plural }}</span>
+                <span class="muted small">{{ e.plural | t }}</span>
               </span>
             </a>
           }

@@ -5,38 +5,40 @@ import { AuthService } from '../core/auth.service';
 import { ConfirmService } from '../core/confirm.service';
 import { EntityMeta, MetaService } from '../core/meta.service';
 import { ToastService } from '../core/toast.service';
+import { I18nService } from '../core/i18n.service';
 import { Icon } from '../ui/icon';
+import { T } from '../ui/t.pipe';
 
 @Component({
   selector: 'app-entity-list',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, T],
   template: `
     @if (meta(); as m) {
       <div class="page">
         <div class="page-header">
           <div class="titles">
-            <h1>{{ m.plural }} @if (data()) { <span class="badge primary" style="vertical-align:middle">{{ data()!.total }}</span> }</h1>
-            <span class="muted small">Manage your {{ m.plural.toLowerCase() }}</span>
+            <h1>{{ m.plural | t }} @if (data()) { <span class="badge primary" style="vertical-align:middle">{{ data()!.total }}</span> }</h1>
+            <span class="muted small">{{ 'Manage your {0}' | t: [(m.plural.toLowerCase())] }}</span>
           </div>
           <span class="spacer"></span>
           <div style="position:relative; width:230px">
             <span style="position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--muted)"><app-icon name="search" [size]="16" /></span>
-            <input type="text" placeholder="Filter this page…" aria-label="Filter rows" style="padding-left:2.1rem" (input)="filter.set($any($event.target).value)" />
+            <input type="text" [placeholder]="'Filter this page…' | t" [attr.aria-label]="'Filter rows' | t" style="padding-left:2.1rem" (input)="filter.set($any($event.target).value)" />
           </div>
           @if (auth.can(m.route + '.create')) {
-            <a class="btn primary" [routerLink]="['/e', m.route, 'new']"><app-icon name="plus" [size]="16" /> New {{ m.label }}</a>
+            <a class="btn primary" [routerLink]="['/e', m.route, 'new']"><app-icon name="plus" [size]="16" /> {{ 'New {0}' | t: [(m.label | t)] }}</a>
           }
         </div>
 
-        @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() }}</div> }
+        @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() | t }}</div> }
 
         <div class="card table-card">
           <div class="table-scroll">
             <table class="data">
               <thead>
                 <tr>
-                  @for (f of m.fields; track f.key) { <th>{{ f.label }}</th> }
-                  @for (r of m.relations; track r.key) { <th>{{ r.label }}</th> }
+                  @for (f of m.fields; track f.key) { <th>{{ f.label | t }}</th> }
+                  @for (r of m.relations; track r.key) { <th>{{ r.label | t }}</th> }
                   <th></th>
                 </tr>
               </thead>
@@ -51,7 +53,7 @@ import { Icon } from '../ui/icon';
                       @for (f of m.fields; track f.key) {
                         <td>
                           @if (f.type === 'Bool') {
-                            <span class="badge" [class.ok]="row[f.key]" [class.no]="!row[f.key]">{{ row[f.key] ? 'Yes' : 'No' }}</span>
+                            <span class="badge" [class.ok]="row[f.key]" [class.no]="!row[f.key]">{{ (row[f.key] ? 'Yes' : 'No') | t }}</span>
                           } @else { {{ show(f.type, row[f.key]) }} }
                         </td>
                       }
@@ -60,12 +62,12 @@ import { Icon } from '../ui/icon';
                       }
                       <td class="actions">
                         @if (auth.can(m.route + '.edit')) {
-                          <a class="btn icon ghost" [routerLink]="['/e', m.route, row['id']]" aria-label="Edit" title="Edit"><app-icon name="edit" [size]="16" /></a>
+                          <a class="btn icon ghost" [routerLink]="['/e', m.route, row['id']]" [attr.aria-label]="'Edit' | t" [title]="'Edit' | t"><app-icon name="edit" [size]="16" /></a>
                         } @else {
-                          <a class="btn icon ghost" [routerLink]="['/e', m.route, row['id']]" aria-label="View details" title="View details"><app-icon name="eye" [size]="16" /></a>
+                          <a class="btn icon ghost" [routerLink]="['/e', m.route, row['id']]" [attr.aria-label]="'View details' | t" [title]="'View details' | t"><app-icon name="eye" [size]="16" /></a>
                         }
                         @if (auth.can(m.route + '.delete', true)) {
-                          <button class="btn icon ghost danger" (click)="remove(m, row)" aria-label="Delete" title="Delete"><app-icon name="trash" [size]="16" /></button>
+                          <button class="btn icon ghost danger" (click)="remove(m, row)" [attr.aria-label]="'Delete' | t" [title]="'Delete' | t"><app-icon name="trash" [size]="16" /></button>
                         }
                       </td>
                     </tr>
@@ -78,23 +80,23 @@ import { Icon } from '../ui/icon';
           @if (!loading() && rows().length === 0) {
             <div class="empty">
               <div class="ico"><app-icon [name]="m.icon" [size]="26" /></div>
-              <h3>No records yet</h3>
-              <p>@if (filter()) { Nothing on this page matches “{{ filter() }}”. } @else { Create the first {{ m.label.toLowerCase() }} to get started. }</p>
-              @if (!filter() && auth.can(m.route + '.create')) { <a class="btn primary" [routerLink]="['/e', m.route, 'new']"><app-icon name="plus" [size]="16" /> New {{ m.label }}</a> }
+              <h3>{{ 'No records yet' | t }}</h3>
+              <p>@if (filter()) { {{ 'Nothing on this page matches “{0}”.' | t: [(filter())] }} } @else { {{ 'Create the first {0} to get started.' | t: [(m.label.toLowerCase())] }} }</p>
+              @if (!filter() && auth.can(m.route + '.create')) { <a class="btn primary" [routerLink]="['/e', m.route, 'new']"><app-icon name="plus" [size]="16" /> {{ 'New {0}' | t: [(m.label | t)] }}</a> }
             </div>
           }
         </div>
 
         <div class="row" style="margin-top:1rem; justify-content:space-between">
-          <span class="muted small">Page {{ page() }} of {{ pages() }} · {{ data()?.total ?? 0 }} records</span>
+          <span class="muted small">{{ 'Page {0} of {1} · {2} records' | t: [(page()), (pages()), (data()?.total ?? 0)] }}</span>
           <div class="row">
-            <button class="btn" (click)="page.set(page() - 1)" [disabled]="page() <= 1"><app-icon name="chevron-left" [size]="16" /> Previous</button>
-            <button class="btn" (click)="page.set(page() + 1)" [disabled]="page() >= pages()">Next <app-icon name="chevron-right" [size]="16" /></button>
+            <button class="btn" (click)="page.set(page() - 1)" [disabled]="page() <= 1"><app-icon name="chevron-left" [size]="16" /> {{ 'Previous' | t }}</button>
+            <button class="btn" (click)="page.set(page() + 1)" [disabled]="page() >= pages()">{{ 'Next' | t }} <app-icon name="chevron-right" [size]="16" /></button>
           </div>
         </div>
       </div>
     } @else {
-      <div class="alert error"><app-icon name="alert" /> Unknown section.</div>
+      <div class="alert error"><app-icon name="alert" /> {{ 'Unknown section.' | t }}</div>
     }
   `
 })
@@ -105,6 +107,7 @@ export class EntityListPage {
   private readonly metaService = inject(MetaService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly i18n = inject(I18nService);
   protected readonly auth = inject(AuthService);
 
   protected readonly meta = computed(() => this.metaService.byRoute(this.entity()));
@@ -161,11 +164,12 @@ export class EntityListPage {
   }
 
   protected async remove(m: EntityMeta, row: Row) {
-    const ok = await this.confirm.ask(`This ${m.label.toLowerCase()} will be permanently deleted.`,
-      { title: `Delete ${m.label.toLowerCase()}?`, confirmText: 'Delete', danger: true });
+    const label = this.i18n.t(m.label).toLowerCase();
+    const ok = await this.confirm.ask('This {0} will be permanently deleted.',
+      { params: [label], title: 'Delete {0}?', titleParams: [label], confirmText: 'Delete', danger: true });
     if (!ok) return;
     this.api.remove(m.route, row['id']).subscribe({
-      next: () => { this.toast.success(`${m.label} deleted.`); this.load(m, this.page()); },
+      next: () => { this.toast.success('{0} deleted.', [this.i18n.t(m.label)]); this.load(m, this.page()); },
       error: (e) => this.toast.error(ApiService.message(e))
     });
   }

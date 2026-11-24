@@ -4,46 +4,47 @@ import { RouterLink } from '@angular/router';
 import { StudioApi } from '../studio-api';
 import { AppDef, GeneratedFile, hasTarget } from '../models';
 import { Icon } from '../ui/icon';
+import { T } from '../ui/t.pipe';
 
 type Tab = 'web' | 'api' | 'code';
 type Device = 'desktop' | 'tablet' | 'mobile';
 
 @Component({
   selector: 'app-preview',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, T],
   template: `
     <div class="row" style="margin-bottom:1.25rem">
-      <a [routerLink]="['/designer', id()]" class="btn ghost"><app-icon name="chevron-left" [size]="16" /> Back to designer</a>
+      <a [routerLink]="['/designer', id()]" class="btn ghost"><app-icon name="chevron-left" [size]="16" /> {{ 'Back to designer' | t }}</a>
       <div style="display:flex;flex-direction:column">
-        <span class="crumbs">Preview</span>
+        <span class="crumbs">{{ 'Preview' | t }}</span>
         <h1 style="font-size:1.35rem">{{ def()?.name }}</h1>
       </div>
       <span class="spacer"></span>
       @if (files()) {
-        <a class="btn primary" [href]="'/download/' + id()" download><app-icon name="download" [size]="16" /> Download project</a>
+        <a class="btn primary" [href]="'/download/' + id()" download><app-icon name="download" [size]="16" /> {{ 'Download project' | t }}</a>
       }
     </div>
 
     @if (errors().length > 0) {
       <div class="alert error" role="alert" style="flex-direction:column">
-        <strong>Fix these in the designer to see the preview</strong>
-        <ul style="margin:.25rem 0 0; padding-left:1.2rem">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul>
+        <strong>{{ 'Fix these in the designer to see the preview' | t }}</strong>
+        <ul style="margin:.25rem 0 0; padding-left:1.2rem">@for (e of errors(); track $index) { <li>{{ e | t }}</li> }</ul>
       </div>
     } @else if (files(); as list) {
       <div class="row" style="margin-bottom:1rem">
         <div class="seg" role="tablist">
           @if (hasWeb()) {
-            <button role="tab" [class.active]="tab() === 'web'" (click)="tab.set('web')"><app-icon name="globe" [size]="16" /> Web app</button>
+            <button role="tab" [class.active]="tab() === 'web'" (click)="tab.set('web')"><app-icon name="globe" [size]="16" /> {{ 'Web app' | t }}</button>
           }
-          <button role="tab" [class.active]="tab() === 'api'" (click)="tab.set('api')"><app-icon name="code" [size]="16" /> API (Swagger)</button>
-          <button role="tab" [class.active]="tab() === 'code'" (click)="tab.set('code')"><app-icon name="file" [size]="16" /> Files ({{ list.length }})</button>
+          <button role="tab" [class.active]="tab() === 'api'" (click)="tab.set('api')"><app-icon name="code" [size]="16" /> {{ 'API (Swagger)' | t }}</button>
+          <button role="tab" [class.active]="tab() === 'code'" (click)="tab.set('code')"><app-icon name="file" [size]="16" /> {{ 'Files ({0})' | t: [(list.length)] }}</button>
         </div>
         <span class="spacer"></span>
         @if (tab() === 'web') {
-          <div class="seg" aria-label="Preview size">
-            <button [class.active]="device() === 'desktop'" (click)="device.set('desktop')" aria-label="Desktop"><app-icon name="monitor" [size]="16" /></button>
-            <button [class.active]="device() === 'tablet'" (click)="device.set('tablet')" aria-label="Tablet"><app-icon name="tablet" [size]="16" /></button>
-            <button [class.active]="device() === 'mobile'" (click)="device.set('mobile')" aria-label="Phone"><app-icon name="smartphone" [size]="16" /></button>
+          <div class="seg" [attr.aria-label]="'Preview size' | t">
+            <button [class.active]="device() === 'desktop'" (click)="device.set('desktop')" [attr.aria-label]="'Desktop' | t"><app-icon name="monitor" [size]="16" /></button>
+            <button [class.active]="device() === 'tablet'" (click)="device.set('tablet')" [attr.aria-label]="'Tablet' | t"><app-icon name="tablet" [size]="16" /></button>
+            <button [class.active]="device() === 'mobile'" (click)="device.set('mobile')" [attr.aria-label]="'Phone' | t"><app-icon name="smartphone" [size]="16" /></button>
           </div>
         }
       </div>
@@ -51,22 +52,23 @@ type Device = 'desktop' | 'tablet' | 'mobile';
       @switch (tab()) {
         @case ('web') {
           <div class="alert info"><app-icon name="sparkles" />
-            <span>This is your <strong>real web app</strong> running against a temporary demo API: add, edit and delete records and try the
-            menu{{ def()?.accessControl ? ' (including the Administration screens: modules, sub-modules, roles and permissions)' : def()?.dynamicMenu ? ' (including the Admin “Menu” editor)' : '' }}. Nothing here is saved to the download.</span></div>
+            <span>{{ (def()?.accessControl
+                ? 'This is your real web app running against a temporary demo API: add, edit and delete records and try the menu and the Administration screens (modules, sub-modules, roles, users and permissions). Nothing here is saved to the download.'
+                : def()?.dynamicMenu
+                  ? 'This is your real web app running against a temporary demo API: add, edit and delete records and try the menu, including the Admin Menu editor. Nothing here is saved to the download.'
+                  : 'This is your real web app running against a temporary demo API: add, edit and delete records and try the menu. Nothing here is saved to the download.') | t }}</span></div>
           <div class="browser" [style.max-width]="width()">
             <div class="bar">
               <span class="dot"></span><span class="dot"></span><span class="dot"></span>
               <span class="url">{{ appUrl() }}</span>
             </div>
-            <iframe [src]="webUrl()" title="Web app preview" style="width:100%; height:72vh; border:0; background:#fff; display:block"></iframe>
+            <iframe [src]="webUrl()" [title]="'Web app preview' | t" style="width:100%; height:72vh; border:0; background:#fff; display:block"></iframe>
           </div>
         }
         @case ('api') {
           <div class="alert info"><app-icon name="sparkles" />
-            <span>A <strong>live preview</strong> of the API your system will have. Use <em>Try it out</em> to add and list records.
-            The downloaded API also requires <strong>login</strong> (JWT, Admin/User roles); this preview skips that so you can explore freely.
-            Needs internet to load Swagger UI.</span></div>
-          <iframe [src]="swaggerUrl()" title="API preview"
+            <span>{{ 'A live preview of the API your system will have. Use Try it out to add and list records. The downloaded API also requires login (JWT, Admin/User roles); this preview skips that so you can explore freely. Needs internet to load Swagger UI.' | t }}</span></div>
+          <iframe [src]="swaggerUrl()" [title]="'API preview' | t"
                   style="width:100%; height:72vh; border:1px solid var(--border); border-radius:12px; background:#fff"></iframe>
         }
         @default {

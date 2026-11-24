@@ -88,6 +88,16 @@ and edit: `entities` (fields and links), `targets`, `accessControl`, and optiona
 A grant key is the entity's plural in lowercase (`students`); actions are View, Create, Edit, Delete. The tests in
 `TemplateTests` check that every template is valid and generates, so a mistake is caught when you run `dotnet test`.
 
+## Languages
+The Studio and every generated web app speak English, French, Portuguese, Spanish, Swahili and Shona. A language picker
+sits in the header (and on the sign-in page); the choice is remembered in the browser.
+
+- Texts live in `public/i18n/<code>.json` (`src/studio-web` for the Studio, `src/ProjectBuilder.Generator/AngularTemplate` for generated apps). The English text is the key; `{0}` marks a value to insert.
+- **Add a language:** copy `fr.json` to `<code>.json`, translate the values, and add `{ "code": "...", "name": "..." }` to `languages.json`.
+- Entity and field names you type yourself show as typed unless you add them to the language files; anything missing falls back to English.
+- `TranslationTests` fails if a text in the pages has no translation in any language.
+- **Please review the translations.** They were machine-written; Shona and Swahili especially need a native speaker's check. Pull requests welcome.
+
 ## Docs
 - [Roadmap & architecture](docs/ROADMAP.md)
 - [Project plan](docs/PROJECT_PLAN.md)

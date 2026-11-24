@@ -6,22 +6,24 @@ import { ApiService, Row } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { EntityMeta, MetaService } from '../core/meta.service';
 import { ToastService } from '../core/toast.service';
+import { I18nService } from '../core/i18n.service';
 import { Icon } from '../ui/icon';
+import { T } from '../ui/t.pipe';
 
 @Component({
   selector: 'app-entity-form',
-  imports: [FormsModule, RouterLink, Icon],
+  imports: [FormsModule, RouterLink, Icon, T],
   template: `
     @if (meta(); as m) {
       <div class="page" style="max-width:860px">
         <div class="page-header">
           <div class="titles">
-            <span class="crumbs"><a [routerLink]="['/e', m.route]">{{ m.plural }}</a> / {{ id() ? 'Edit' : 'New' }}</span>
-            <h1>{{ id() ? 'Edit' : 'New' }} {{ m.label }}</h1>
+            <span class="crumbs"><a [routerLink]="['/e', m.route]">{{ m.plural | t }}</a> / {{ (id() ? 'Edit' : 'New') | t }}</span>
+            <h1>{{ (id() ? 'Edit {0}' : 'New {0}') | t: [(m.label | t)] }}</h1>
           </div>
         </div>
 
-        @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() }}</div> }
+        @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() | t }}</div> }
 
         @if (loading()) {
           <div class="card">
@@ -29,18 +31,18 @@ import { Icon } from '../ui/icon';
           </div>
         } @else {
           <form class="card" (ngSubmit)="save(m)">
-            @if (readOnly(m)) { <div class="alert info"><app-icon name="eye" /> You can view this record but not change it.</div> }
+            @if (readOnly(m)) { <div class="alert info"><app-icon name="eye" /> {{ 'You can view this record but not change it.' | t }}</div> }
             <fieldset [disabled]="readOnly(m)" style="border:0;padding:0;margin:0;min-width:0">
             <div class="form-grid">
               @for (f of m.fields; track f.key) {
                 <div [class.full]="f.type === 'Text'">
-                  <label class="lbl" [for]="f.key">{{ f.label }}@if (f.required) { <span class="req"> *</span> }</label>
+                  <label class="lbl" [for]="f.key">{{ f.label | t }}@if (f.required) { <span class="req"> *</span> }</label>
                   @switch (f.type) {
                     @case ('Text') {
                       <textarea [id]="f.key" [name]="f.key" rows="4" [(ngModel)]="model[f.key]" [required]="f.required"></textarea>
                     }
                     @case ('Bool') {
-                      <label class="row" style="gap:.6rem; padding:.4rem 0"><input [id]="f.key" [name]="f.key" type="checkbox" [(ngModel)]="model[f.key]" /> <span class="muted">Enabled</span></label>
+                      <label class="row" style="gap:.6rem; padding:.4rem 0"><input [id]="f.key" [name]="f.key" type="checkbox" [(ngModel)]="model[f.key]" /> <span class="muted">{{ 'Enabled' | t }}</span></label>
                     }
                     @case ('Int') { <input [id]="f.key" [name]="f.key" type="number" step="1" [(ngModel)]="model[f.key]" [required]="f.required" /> }
                     @case ('Long') { <input [id]="f.key" [name]="f.key" type="number" step="1" [(ngModel)]="model[f.key]" [required]="f.required" /> }
@@ -55,9 +57,9 @@ import { Icon } from '../ui/icon';
               }
               @for (r of m.relations; track r.key) {
                 <div>
-                  <label class="lbl" [for]="r.key">{{ r.label }}@if (r.required) { <span class="req"> *</span> }</label>
+                  <label class="lbl" [for]="r.key">{{ r.label | t }}@if (r.required) { <span class="req"> *</span> }</label>
                   <select [id]="r.key" [name]="r.key" [(ngModel)]="model[r.key]" [required]="r.required">
-                    <option [ngValue]="null">— choose —</option>
+                    <option [ngValue]="null">{{ '— choose —' | t }}</option>
                     @for (o of options()[r.key]; track o.id) { <option [ngValue]="o.id">{{ o.text }}</option> }
                   </select>
                 </div>
@@ -65,16 +67,16 @@ import { Icon } from '../ui/icon';
             </div>
             </fieldset>
             <div class="row" style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid var(--border); justify-content:flex-end">
-              <a class="btn" [routerLink]="['/e', m.route]">{{ readOnly(m) ? 'Back' : 'Cancel' }}</a>
+              <a class="btn" [routerLink]="['/e', m.route]">{{ (readOnly(m) ? 'Back' : 'Cancel') | t }}</a>
               @if (!readOnly(m)) {
-                <button class="btn primary" type="submit" [disabled]="busy()"><app-icon name="check" [size]="16" /> {{ busy() ? 'Saving…' : 'Save' }}</button>
+                <button class="btn primary" type="submit" [disabled]="busy()"><app-icon name="check" [size]="16" /> {{ (busy() ? 'Saving…' : 'Save') | t }}</button>
               }
             </div>
           </form>
         }
       </div>
     } @else {
-      <div class="alert error"><app-icon name="alert" /> Unknown section.</div>
+      <div class="alert error"><app-icon name="alert" /> {{ 'Unknown section.' | t }}</div>
     }
   `
 })
@@ -86,6 +88,7 @@ export class EntityFormPage {
   private readonly router = inject(Router);
   private readonly metaService = inject(MetaService);
   private readonly toast = inject(ToastService);
+  private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
 
   protected readonly meta = computed(() => this.metaService.byRoute(this.entity()));
@@ -154,7 +157,7 @@ export class EntityFormPage {
     const id = this.id();
     const call: Observable<unknown> = id ? this.api.update(m.route, id, body) : this.api.create(m.route, body);
     call.subscribe({
-      next: () => { this.toast.success(`${m.label} saved.`); this.router.navigate(['/e', m.route]); },
+      next: () => { this.toast.success('{0} saved.', [this.i18n.t(m.label)]); this.router.navigate(['/e', m.route]); },
       error: (e: unknown) => { this.error.set(ApiService.message(e)); this.busy.set(false); }
     });
   }

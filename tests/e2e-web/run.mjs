@@ -114,6 +114,12 @@ try {
   if (!page.url().endsWith('/login')) throw new Error('unauthenticated visit should redirect to /login, got ' + page.url());
   ok('unauthenticated visit redirects to the login page');
 
+  await page.select('app-language-switcher select', 'es');
+  await bodyHas('Bienvenido de nuevo');
+  await page.select('app-language-switcher select', 'en');
+  await bodyHas('Welcome back');
+  ok('the login page can be switched to Spanish and back to English');
+
   await setValue('#email', adminEmail);
   await setValue('#password', 'wrong-password');
   await page.click('button[type=submit]');
@@ -131,6 +137,33 @@ try {
   const groups = await page.$$eval('nav .group', (g) => g.map((x) => x.textContent.trim()));
   if (!groups.includes('Data') || !groups.includes('Administration')) throw new Error('menu groups missing: ' + groups.join(', '));
   ok('admin sees the module menu (groups: ' + groups.join(', ') + ') with sub-modules: ' + adminMenu.join(', '));
+
+  // ---- languages: French, then Shona; the choice is remembered; English again before the rest ----
+  await page.select('app-language-switcher select', 'fr');
+  await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Élèves')));
+  const frMenu = await page.$$eval('nav a', (a) => a.map((x) => x.textContent.trim()));
+  for (const want of ['Tableau de bord', 'Élèves', 'Tuteurs', 'Rôles', 'Utilisateurs'])
+    if (!frMenu.includes(want)) throw new Error('French menu is missing "' + want + '": ' + frMenu.join(', '));
+  const frGroups = await page.$$eval('nav .group', (g) => g.map((x) => x.textContent.trim()));
+  if (!frGroups.includes('Données') || !frGroups.includes('Administration')) throw new Error('French menu groups: ' + frGroups.join(', '));
+  await clickText('nav a', 'Élèves');
+  await page.waitForFunction(() => document.querySelector('h1')?.textContent.includes('Élèves'));
+  await bodyHas('Nouveau : Élève');
+  await bodyHas('Aucun enregistrement');
+  ok('French: menu, headings and buttons are translated (' + frMenu.slice(0, 4).join(', ') + ' ...)');
+
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Élèves')));
+  const lang = await page.evaluate(() => document.documentElement.lang);
+  if (lang !== 'fr') throw new Error('html lang should be fr after reload, got ' + lang);
+  ok('the language is remembered after a reload (html lang="fr")');
+
+  await page.select('app-language-switcher select', 'sn');
+  await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Vadzidzi')));
+  await page.select('app-language-switcher select', 'en');
+  await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.trim() === 'Students'));
+  ok('Shona and back to English');
+  await page.goto(base + '/', { waitUntil: 'networkidle0' });
 
   // a second, non-admin user for the role checks at the end
   const session = await page.evaluate(() => JSON.parse(localStorage.getItem('session')));

@@ -5,6 +5,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { ConfigService } from './core/config.service';
 import { MetaService } from './core/meta.service';
+import { I18nService } from './core/i18n.service';
 import { authInterceptor } from './core/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -17,8 +18,10 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(async () => {
       const config = inject(ConfigService);
       const meta = inject(MetaService);
+      const i18n = inject(I18nService);
       await config.load();
       await meta.load();
+      await i18n.init(); // language list + the language chosen last time
     })
   ]
 };

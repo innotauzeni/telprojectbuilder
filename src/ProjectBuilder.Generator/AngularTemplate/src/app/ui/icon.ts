@@ -35,6 +35,7 @@ const ICONS: Record<string, string> = {
   'arrow-down': '<path d="M12 5v14M6 13l6 6 6-6"/>',
   eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   shield: '<path d="M12 3 4 6v6c0 4.5 3.3 7.8 8 9 4.7-1.2 8-4.5 8-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
   'chevron-down': '<path d="M5 9l7 7 7-7"/>'
 };

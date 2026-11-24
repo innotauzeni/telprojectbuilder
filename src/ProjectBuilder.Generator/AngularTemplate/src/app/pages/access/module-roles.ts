@@ -4,34 +4,35 @@ import { AccessService, ModuleDto, RoleDto } from '../../core/access.service';
 import { ApiService } from '../../core/api.service';
 import { ToastService } from '../../core/toast.service';
 import { Icon } from '../../ui/icon';
+import { T } from '../../ui/t.pipe';
 
 /** "Menu permission": choose which roles can see a menu (system module). */
 @Component({
   selector: 'app-module-roles',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, T],
   template: `
     <div class="page" style="max-width:760px">
       <div class="page-header">
         <div class="titles">
-          <span class="crumbs"><a routerLink="/admin/modules">System modules</a> /
-            <a [routerLink]="['/admin/modules', moduleId()]">{{ module()?.name }}</a> / Menu permission</span>
-          <h1>Who can see “{{ module()?.name }}”?</h1>
-          <span class="muted small">Roles ticked here get this menu and all its sub-modules (a sub-module still needs its View permission).</span>
+          <span class="crumbs"><a routerLink="/admin/modules">{{ 'System modules' | t }}</a> /
+            <a [routerLink]="['/admin/modules', moduleId()]">{{ module()?.name | t }}</a> / {{ 'Menu permission' | t }}</span>
+          <h1>{{ 'Who can see “{0}”?' | t: [(module()?.name | t)] }}</h1>
+          <span class="muted small">{{ 'Roles ticked here get this menu and all its sub-modules (a sub-module still needs its View permission).' | t }}</span>
         </div>
       </div>
 
-      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() }}</div> }
+      @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() | t }}</div> }
 
       <div class="card table-card">
         <table class="data">
-          <thead><tr><th style="width:60px">Can see</th><th>Role</th><th>Type</th><th>Level</th></tr></thead>
+          <thead><tr><th style="width:60px">{{ 'Can see' | t }}</th><th>{{ 'Role' | t }}</th><th>{{ 'Type' | t }}</th><th>{{ 'Level' | t }}</th></tr></thead>
           <tbody>
             @if (loading()) { @for (i of [1, 2, 3]; track i) { <tr><td colspan="4"><div class="skeleton" style="height:1.1rem"></div></td></tr> } }
             @for (r of roles(); track r.id) {
               <tr>
                 <td><input type="checkbox" [checked]="r.name === 'Admin' || picked().has(r.id)" [disabled]="r.name === 'Admin'"
-                           (change)="toggle(r.id)" [attr.aria-label]="'Menu for ' + r.name" /></td>
-                <td style="font-weight:600">{{ r.name }} @if (r.name === 'Admin') { <span class="badge primary">always</span> }</td>
+                           (change)="toggle(r.id)" [attr.aria-label]="'Menu for {0}' | t: [r.name]" /></td>
+                <td style="font-weight:600">{{ r.name }} @if (r.name === 'Admin') { <span class="badge primary">{{ 'always' | t }}</span> }</td>
                 <td class="muted">{{ r.type || '—' }}</td>
                 <td class="muted">{{ r.level || '—' }}</td>
               </tr>
@@ -41,8 +42,8 @@ import { Icon } from '../../ui/icon';
       </div>
 
       <div class="sticky-bar">
-        <a class="btn" [routerLink]="['/admin/modules']">Back</a>
-        <button class="btn primary" (click)="save()" [disabled]="busy() || loading()"><app-icon name="check" [size]="16" /> {{ busy() ? 'Saving…' : 'Save' }}</button>
+        <a class="btn" [routerLink]="['/admin/modules']">{{ 'Back' | t }}</a>
+        <button class="btn primary" (click)="save()" [disabled]="busy() || loading()"><app-icon name="check" [size]="16" /> {{ (busy() ? 'Saving…' : 'Save') | t }}</button>
       </div>
     </div>
   `

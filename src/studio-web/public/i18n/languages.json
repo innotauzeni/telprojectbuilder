@@ -1,0 +1,26 @@
+[
+  {
+    "code": "en",
+    "name": "English"
+  },
+  {
+    "code": "fr",
+    "name": "Français"
+  },
+  {
+    "code": "pt",
+    "name": "Português"
+  },
+  {
+    "code": "es",
+    "name": "Español"
+  },
+  {
+    "code": "sw",
+    "name": "Kiswahili"
+  },
+  {
+    "code": "sn",
+    "name": "chiShona"
+  }
+]

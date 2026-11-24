@@ -5,40 +5,43 @@ import { ConfirmService } from './core/confirm.service';
 import { ThemeService } from './core/theme.service';
 import { ToastService } from './core/toast.service';
 import { Icon } from './ui/icon';
+import { T } from './ui/t.pipe';
+import { LanguageSwitcher } from './ui/language-switcher';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, Icon],
+  imports: [RouterOutlet, RouterLink, Icon, T, LanguageSwitcher],
   template: `
     <header>
       <div class="bar">
-        <a routerLink="/" class="brand" aria-label="ProjectBuilder Studio home">
+        <a routerLink="/" class="brand" [attr.aria-label]="'ProjectBuilder Studio home' | t">
           <span class="logo"><app-icon name="layers" [size]="18" /></span>
           <span>ProjectBuilder <b>Studio</b></span>
         </a>
         <span class="spacer"></span>
         @if (auth.email(); as email) {
-          <a class="btn ghost" routerLink="/"><app-icon name="table" [size]="16" /> Projects</a>
+          <a class="btn ghost" routerLink="/"><app-icon name="table" [size]="16" /> {{ 'Projects' | t }}</a>
           <span class="who" [title]="email"><span class="avatar">{{ email[0].toUpperCase() }}</span><span class="addr">{{ email }}</span></span>
-          <button class="btn ghost" (click)="signOut()" aria-label="Sign out"><app-icon name="log-out" [size]="16" /> Sign out</button>
+          <button class="btn ghost" (click)="signOut()" [attr.aria-label]="'Sign out' | t"><app-icon name="log-out" [size]="16" /> {{ 'Sign out' | t }}</button>
         } @else {
-          <a class="btn ghost" routerLink="/login">Sign in</a>
-          <a class="btn primary" routerLink="/register">Create account</a>
+          <a class="btn ghost" routerLink="/login">{{ 'Sign in' | t }}</a>
+          <a class="btn primary" routerLink="/register">{{ 'Create account' | t }}</a>
         }
-        <button class="btn icon ghost" (click)="theme.toggle()" [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+        <app-language-switcher />
+        <button class="btn icon ghost" (click)="theme.toggle()" [attr.aria-label]="(theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode') | t">
           <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
         </button>
       </div>
     </header>
     <main><router-outlet /></main>
-    <footer class="muted small">Open source · MIT licensed · Generated systems are yours, with no lock-in.</footer>
+    <footer class="muted small">{{ 'Open source · MIT licensed · Generated systems are yours, with no lock-in.' | t }}</footer>
 
     <div class="toasts" aria-live="polite">
       @for (t of toast.toasts(); track t.id) {
         <div class="toast" [class.success]="t.kind === 'success'" [class.error]="t.kind === 'error'" role="status">
           <app-icon [name]="t.kind === 'success' ? 'check' : 'alert'" />
           <span style="flex:1">{{ t.text }}</span>
-          <button class="btn icon ghost" style="width:1.6rem;height:1.6rem;padding:.2rem" (click)="toast.dismiss(t.id)" aria-label="Dismiss"><app-icon name="x" [size]="14" /></button>
+          <button class="btn icon ghost" style="width:1.6rem;height:1.6rem;padding:.2rem" (click)="toast.dismiss(t.id)" [attr.aria-label]="'Dismiss' | t"><app-icon name="x" [size]="14" /></button>
         </div>
       }
     </div>
@@ -49,7 +52,7 @@ import { Icon } from './ui/icon';
           <h2>{{ c.title }}</h2>
           <p class="muted" style="margin:.25rem 0 1.25rem">{{ c.message }}</p>
           <div class="row" style="justify-content:flex-end">
-            <button class="btn" (click)="confirm.answer(false)">Cancel</button>
+            <button class="btn" (click)="confirm.answer(false)">{{ 'Cancel' | t }}</button>
             <button class="btn" [class.danger]="c.danger" [class.solid]="c.danger" [class.primary]="!c.danger" (click)="confirm.answer(true)">{{ c.confirmText }}</button>
           </div>
         </div>

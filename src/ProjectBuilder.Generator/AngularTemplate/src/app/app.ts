@@ -8,27 +8,29 @@ import { MetaService } from './core/meta.service';
 import { ThemeService } from './core/theme.service';
 import { ToastService } from './core/toast.service';
 import { Icon } from './ui/icon';
+import { T } from './ui/t.pipe';
+import { LanguageSwitcher } from './ui/language-switcher';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, T, LanguageSwitcher],
   template: `
     @if (auth.isLoggedIn()) {
       <div class="shell">
         @if (open()) { <div class="scrim" (click)="open.set(false)"></div> }
-        <aside [class.open]="open()" aria-label="Main navigation">
+        <aside [class.open]="open()" [attr.aria-label]="'Main navigation' | t">
           <a routerLink="/" class="brand" (click)="open.set(false)">
             <span class="logo">{{ initials() }}</span>
             <span class="name">{{ meta.appName() }}</span>
           </a>
-          @if (config.preview) { <span class="preview-tag">Preview mode</span> }
+          @if (config.preview) { <span class="preview-tag">{{ 'Preview mode' | t }}</span> }
           <nav>
             @for (m of menu.items(); track m.label) {
               @if (m.children?.length) {
                 <!-- a system module (menu) with its sub-modules (submenu) -->
                 <button class="group" (click)="toggle(m.label)" [attr.aria-expanded]="isOpen(m.label)">
                   <app-icon [name]="m.icon || 'table'" [size]="18" />
-                  <span>{{ m.label }}</span>
+                  <span>{{ m.label | t }}</span>
                   <app-icon class="chev" [name]="isOpen(m.label) ? 'chevron-down' : 'chevron-right'" [size]="16" />
                 </button>
                 @if (isOpen(m.label)) {
@@ -36,7 +38,7 @@ import { Icon } from './ui/icon';
                     @for (c of m.children; track c.label + c.route) {
                       <a [routerLink]="c.route" routerLinkActive="active" (click)="open.set(false)">
                         <app-icon [name]="c.icon || 'table'" [size]="16" />
-                        <span>{{ c.label }}</span>
+                        <span>{{ c.label | t }}</span>
                       </a>
                     }
                   </div>
@@ -45,7 +47,7 @@ import { Icon } from './ui/icon';
                 <a [routerLink]="m.route" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: m.route === '/' }"
                    (click)="open.set(false)">
                   <app-icon [name]="m.icon || 'table'" [size]="18" />
-                  <span>{{ m.label }}</span>
+                  <span>{{ m.label | t }}</span>
                 </a>
               }
             }
@@ -57,16 +59,17 @@ import { Icon } from './ui/icon';
               <span class="role">{{ auth.role() }}</span>
             </div>
             @if (!config.preview) {
-              <button class="btn icon ghost" (click)="logout()" aria-label="Log out" title="Log out"><app-icon name="log-out" /></button>
+              <button class="btn icon ghost" (click)="logout()" [attr.aria-label]="'Log out' | t" [title]="'Log out' | t"><app-icon name="log-out" /></button>
             }
           </div>
         </aside>
 
         <div class="content">
           <header class="topbar">
-            <button class="btn icon ghost menu-btn" (click)="open.set(true)" aria-label="Open menu"><app-icon name="menu" [size]="20" /></button>
+            <button class="btn icon ghost menu-btn" (click)="open.set(true)" [attr.aria-label]="'Open menu' | t"><app-icon name="menu" [size]="20" /></button>
             <span class="spacer"></span>
-            <button class="btn icon ghost" (click)="theme.toggle()" [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+            <app-language-switcher />
+            <button class="btn icon ghost" (click)="theme.toggle()" [attr.aria-label]="(theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode') | t">
               <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
             </button>
           </header>
@@ -82,7 +85,7 @@ import { Icon } from './ui/icon';
         <div class="toast" [class.success]="t.kind === 'success'" [class.error]="t.kind === 'error'" role="status">
           <app-icon [name]="t.kind === 'success' ? 'check' : 'alert'" />
           <span style="flex:1">{{ t.text }}</span>
-          <button class="btn icon ghost" style="width:1.6rem;height:1.6rem;padding:.2rem" (click)="toast.dismiss(t.id)" aria-label="Dismiss"><app-icon name="x" [size]="14" /></button>
+          <button class="btn icon ghost" style="width:1.6rem;height:1.6rem;padding:.2rem" (click)="toast.dismiss(t.id)" [attr.aria-label]="'Dismiss' | t"><app-icon name="x" [size]="14" /></button>
         </div>
       }
     </div>
@@ -93,7 +96,7 @@ import { Icon } from './ui/icon';
           <h2>{{ c.title }}</h2>
           <p class="muted" style="margin:.25rem 0 1.25rem">{{ c.message }}</p>
           <div class="row" style="justify-content:flex-end">
-            <button class="btn" (click)="confirm.answer(false)">Cancel</button>
+            <button class="btn" (click)="confirm.answer(false)">{{ 'Cancel' | t }}</button>
             <button class="btn" [class.danger]="c.danger" [class.solid]="c.danger" [class.primary]="!c.danger"
                     (click)="confirm.answer(true)">{{ c.confirmText }}</button>
           </div>
