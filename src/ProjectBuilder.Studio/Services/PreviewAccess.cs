@@ -54,11 +54,12 @@ public static partial class PreviewAccess
         s.Users.Add(new UserRec { Email = "preview@example.com", Roles = ["Admin"], IsMe = true });
         s.Users.Add(new UserRec { Email = "teacher@example.com", Roles = ["User"] });
 
+        Module? dataModule = null;
         foreach (var m in AccessControlSeed.Default(def))
         {
             var mod = new Module { Id = s.NextId++, Name = m.Name, Slugname = m.Slug, Icon = m.Icon, AccessName = m.Slug, SortOrder = m.Order };
             s.Modules.Add(mod);
-            if (m.ForUser) s.RoleMenus.Add((user.Id, mod.Id));
+            if (m.ForUser) { s.RoleMenus.Add((user.Id, mod.Id)); dataModule = mod; }
             foreach (var sm in m.Subs)
             {
                 s.Subs.Add(new Sub { Id = s.NextId++, ModuleId = mod.Id, Name = sm.Name, Icon = sm.Icon, Route = sm.Route, AccessName = sm.Key, Order = sm.Order });
@@ -69,6 +70,16 @@ public static partial class PreviewAccess
                     if (m.ForUser && action != "Delete") s.RolePerms.Add((user.Id, p.Id));
                 }
             }
+        }
+
+        // roles that come with the template (for example Teacher or Bursar)
+        foreach (var er in AccessControlSeed.ExtraRoles(def))
+        {
+            var role = new RoleRec { Name = er.Name, Type = er.Type, Level = er.Level };
+            s.Roles.Add(role);
+            if (dataModule is not null) s.RoleMenus.Add((role.Id, dataModule.Id));
+            foreach (var code in er.Grants)
+                if (s.Perms.FirstOrDefault(p => p.Name == code) is { } granted) s.RolePerms.Add((role.Id, granted.Id));
         }
         return s;
     }

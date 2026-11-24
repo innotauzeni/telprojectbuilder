@@ -17,6 +17,8 @@ export interface AppDef {
   dynamicMenu: boolean;
   /** Modules (menu), sub-modules (submenu), permissions and roles, stored in the database and enforced by the API. */
   accessControl: boolean;
+  /** Roles a template ships with (name, type, level and what each may do). Kept as-is when the design is saved. */
+  roles?: { name: string; type?: string | null; level?: string | null; grants: Record<string, string[]> }[];
   entities: EntityDef[];
 }
 

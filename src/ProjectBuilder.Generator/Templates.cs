@@ -447,6 +447,8 @@ internal static class Tpl
                     // system modules (menu) -> sub-modules (submenu) -> permissions. The User role gets the "Data" menu and every
                     // permission except Delete; Admin needs no grants because it always has everything.
                     var userRole = await roles.FindByNameAsync("User");
+                    var permsByName = new Dictionary<string, Permission>();
+                    SystemModule? dataModule = null;
                     var data = new (string Name, string Slug, string Icon, int Order, bool ForUser, (string Name, string Key, string Route, string Icon, int Order, string[] Actions)[] Subs)[]
                     {
         {{~ for m in Modules ~}}
@@ -464,6 +466,7 @@ internal static class Tpl
                         var module = new SystemModule { Name = m.Name, Slugname = m.Slug, Icon = m.Icon, AccessName = m.Slug, SortOrder = m.Order };
                         acdb.SystemModules.Add(module);
                         if (userRole is not null && m.ForUser) acdb.RoleMenus.Add(new RoleMenu { Role = userRole, Menu = module });
+                        if (m.ForUser) dataModule = module;
 
                         foreach (var s in m.Subs)
                         {
@@ -475,11 +478,34 @@ internal static class Tpl
                                     Name = s.Key + "." + action.ToLowerInvariant(), DisplayName = action + " " + s.Name, Module = s.Name
                                 };
                                 acdb.Permissions.Add(permission);
+                                permsByName[permission.Name] = permission;
                                 if (userRole is not null && m.ForUser && action != "Delete")
                                     acdb.RolePermissions.Add(new RolePermission { Role = userRole, Permission = permission });
                             }
                         }
                     }
+
+                    // extra roles that come with this system (for example Teacher or Bursar), each with its menu and permissions
+                    var extraRoles = new (string Name, string? Type, string? Level, string[] Grants)[]
+                    {
+        {{~ for r in ExtraRoles ~}}
+                        ("{{ r.Name }}", {{ if r.Type == "" }}null{{ else }}"{{ r.Type }}"{{ end }}, {{ if r.Level == "" }}null{{ else }}"{{ r.Level }}"{{ end }}, new string[] { {{ for g in r.Grants }}"{{ g }}"{{ if !for.last }}, {{ end }}{{ end }} }),
+        {{~ end ~}}
+                    };
+                    foreach (var extra in extraRoles)
+                    {
+                        var role = await roles.FindByNameAsync(extra.Name);
+                        if (role is null)
+                        {
+                            role = new Role { Name = extra.Name, Type = extra.Type, Level = extra.Level };
+                            await roles.CreateAsync(role);
+                        }
+                        if (dataModule is not null) acdb.RoleMenus.Add(new RoleMenu { Role = role, Menu = dataModule });
+                        foreach (var code in extra.Grants)
+                            if (permsByName.TryGetValue(code, out var granted))
+                                acdb.RolePermissions.Add(new RolePermission { Role = role, Permission = granted });
+                    }
+
                     await acdb.SaveChangesAsync();
                 }
         {{~ end ~}}

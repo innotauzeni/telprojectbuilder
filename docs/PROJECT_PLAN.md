@@ -66,7 +66,11 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 
 ### Epic E – Templates
 - [x] Enrolment (Student, Guardian, Course, Term, Enrolment, Payment; Fee TODO)
-- [ ] School Management (Phase 2)
+- [x] School Management: 13 entities (academic years, teachers, subjects, classes, students, guardians, timetable, attendance, assessments, results, fee structures, invoices, fee payments) with preset Teacher, Registrar and Bursar roles — API-tested end to end, previewed in the Studio
+- [x] Templates can ship preset roles (name, type, level, per-entity grants), validated and seeded; shown in the Studio preview
+- [ ] Sample data for templates (a few students, classes, invoices) so a new system does not start empty
+- [ ] Report cards / printable PDFs (results per student per term)
+- [ ] More templates: clinic, inventory, library, church, HR, POS
 
 ## Working agreements
 - Weekly demo of something runnable. Never go >2 weeks without a working end-to-end path.

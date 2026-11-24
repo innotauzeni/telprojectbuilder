@@ -9,6 +9,9 @@ public sealed record SeedSubModule(string Name, string Key, string Route, string
 /// <param name="ForUser">Whether the built-in User role gets this menu.</param>
 public sealed record SeedModule(string Name, string Slug, string Icon, int Order, bool ForUser, IReadOnlyList<SeedSubModule> Subs);
 
+/// <param name="Grants">Permission names such as "students.view".</param>
+public sealed record SeedRole(string Name, string? Type, string? Level, IReadOnlyList<string> Grants);
+
 /// <summary>
 /// The access-control data a new system starts with: system modules (menu) -> sub-modules (submenu) -> permissions.
 /// One sub-module per entity with View/Create/Edit/Delete, plus an Administration module for the admin screens.
@@ -21,6 +24,12 @@ public static class AccessControlSeed
     /// <summary>Permission names are "{accessName}.{action}" (lowercase action, spaces as dashes), e.g. students.create.</summary>
     public static string PermissionName(string accessName, string action) =>
         accessName + "." + action.Trim().ToLowerInvariant().Replace(' ', '-');
+
+    /// <summary>The extra roles a template ships with, with their permissions spelled out as names (students.view ...).</summary>
+    public static IReadOnlyList<SeedRole> ExtraRoles(AppDefinition app) =>
+        app.Roles.Select(r => new SeedRole(r.Name, r.Type, r.Level,
+            r.Grants.SelectMany(g => g.Value.Select(a => PermissionName(g.Key, CrudActions.First(c => c.Equals(a, StringComparison.OrdinalIgnoreCase)))))
+                .Distinct().ToList())).ToList();
 
     public static IReadOnlyList<SeedModule> Default(AppDefinition app)
     {

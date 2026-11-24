@@ -38,11 +38,11 @@ public static class MenuSeed
         if (Has(n, "student", "pupil", "learner", "graduate")) return "graduation-cap";
         if (Has(n, "guardian", "parent", "user", "person", "teacher", "staff", "employee", "customer", "member", "client", "patient", "contact")) return "users";
         if (Has(n, "course", "subject", "class", "book", "lesson", "library", "module")) return "book";
-        if (Has(n, "term", "semester", "calendar", "schedule", "attendance", "event", "appointment", "timetable")) return "calendar";
+        if (Has(n, "term", "semester", "calendar", "schedule", "attendance", "event", "appointment", "timetable", "year")) return "calendar";
         if (Has(n, "payment", "fee", "invoice", "price", "billing", "receipt", "expense", "salary")) return "credit-card";
         if (Has(n, "enrol", "enroll", "registration", "application", "order")) return "clipboard";
         if (Has(n, "product", "item", "stock", "inventory")) return "box";
-        if (Has(n, "report", "grade", "result", "score", "exam")) return "chart";
+        if (Has(n, "report", "grade", "result", "score", "exam", "assess")) return "chart";
         return "table";
     }
 }

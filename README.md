@@ -6,7 +6,7 @@ result and deploy it anywhere. The output has no dependency on ProjectBuilder, s
 A Flutter mobile app is on the roadmap.
 
 > **Status: early alpha (Phase 1).** Working today: Studio designer, a live preview of the real web app and API, the
-> Enrolment template, API generation for SQLite / SQL Server / PostgreSQL with login and Admin/User roles, a modern
+> Enrolment and School Management templates (the latter with preset Teacher, Registrar and Bursar roles), API generation for SQLite / SQL Server / PostgreSQL with login and Admin/User roles, a modern
 > Angular web app (light/dark, responsive), optional **access control** (modules, sub-modules, permissions and roles,
 > enforced by the API) or a simpler **dynamic menu**, Studio **accounts** (sign up, private projects) and ZIP download.
 > Not yet: migrations, multi-language UI, email verification / password reset, Flutter app.
@@ -26,7 +26,7 @@ npm run build
 cd ../..
 dotnet run --project src/ProjectBuilder.Studio --urls http://localhost:5230
 ```
-Open http://localhost:5230 → pick the **Enrolment System** template → tweak → **Preview** (your real web app running on a
+Open http://localhost:5230 → pick a template (**Enrolment System** or **School Management**) → tweak → **Preview** (your real web app running on a
 demo API, plus Swagger and the generated code) → **Download**.
 
 **Access control:** switch it on in the designer and the generated system gets database tables for **system modules**
@@ -76,6 +76,17 @@ src/studio-web                 Angular app: template gallery, designer, preview
 templates/                     starter systems (JSON)
 tests/                         unit tests + tests that build and run the generated projects
 ```
+
+## Adding your own template
+A template is one JSON file in `templates/` (it appears in the Studio automatically). Copy `templates/school-management.json`
+and edit: `entities` (fields and links), `targets`, `accessControl`, and optional preset `roles`:
+
+```json
+"roles": [ { "name": "Teacher", "type": "Staff", "level": "Standard",
+             "grants": { "students": ["View"], "attendancerecords": ["View", "Create", "Edit"] } } ]
+```
+A grant key is the entity's plural in lowercase (`students`); actions are View, Create, Edit, Delete. The tests in
+`TemplateTests` check that every template is valid and generates, so a mistake is caught when you run `dotnet test`.
 
 ## Docs
 - [Roadmap & architecture](docs/ROADMAP.md)

@@ -40,7 +40,7 @@ import { Icon } from '../ui/icon';
             <span class="badge primary">Template</span>
           </div>
           <h3>{{ t.name }}</h3>
-          <p class="muted small" style="margin:.25rem 0 1rem">{{ t.entityCount }} entities · API, web app and dynamic menu included</p>
+          <p class="muted small" style="margin:.25rem 0 1rem">{{ t.entityCount }} entities · API, web app, roles and permissions included</p>
           <button class="btn primary" (click)="create(t.key)" [disabled]="busy()">Use this template</button>
         </div>
       }

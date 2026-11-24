@@ -236,6 +236,34 @@ try {
   if (!['dark', 'light'].includes(theme)) throw new Error('theme not applied');
   ok('theme toggle works (' + theme + ')');
 
+  // ---- the School Management template: opens, previews, and ships its roles ----
+  await page.goto(base + '/', { waitUntil: 'networkidle0' });
+  await bodyHas(page, 'School Management');
+  await page.evaluate(() => {
+    const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes('School Management'));
+    [...card.querySelectorAll('button')].find((b) => b.textContent.includes('Use this template')).click();
+  });
+  await page.waitForFunction(() => location.pathname.startsWith('/designer/'));
+  await page.waitForSelector('#name');
+  await page.waitForFunction(() => document.querySelectorAll('.entity-head').length === 13);
+  ok('School Management template opens in the designer with its 13 entities');
+
+  await clickText(page, 'button', 'Preview');
+  await page.waitForFunction(() => location.pathname.startsWith('/preview/'));
+  await page.waitForSelector('.browser iframe');
+  const school = await (await page.$('.browser iframe')).contentFrame();
+  await school.waitForSelector('nav a');
+  await school.waitForFunction(() => document.querySelectorAll('nav a').length >= 10);
+  const schoolMenu = await school.$$eval('nav a', (a) => a.map((x) => x.textContent.trim()));
+  for (const want of ['Teachers', 'School Classes', 'Timetable Entries', 'Attendance Records', 'Results', 'Invoices', 'Fee Payments'])
+    if (!schoolMenu.includes(want)) throw new Error('school menu is missing "' + want + '": ' + schoolMenu.join(', '));
+  ok('school preview menu: ' + schoolMenu.join(', '));
+
+  await clickText(school, 'nav a', 'Roles');
+  await school.waitForFunction(() => document.querySelector('h1')?.textContent.includes('Roles'));
+  await school.waitForFunction(() => ['Teacher', 'Registrar', 'Bursar'].every((r) => [...document.querySelectorAll('tbody tr')].some((t) => t.textContent.includes(r))));
+  ok('the preview already has the Teacher, Registrar and Bursar roles');
+
   // ---- sign out: the session ends and the project is no longer reachable ----
   await page.goto(base + '/', { waitUntil: 'networkidle0' });
   await clickText(page, 'button', 'Sign out');

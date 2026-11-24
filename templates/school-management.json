@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "name": "School Management",
+  "database": "Sqlite",
+  "targets": "WebApi, WebApp, Docker",
+  "dynamicMenu": false,
+  "accessControl": true,
+  "roles": [
+    {
+      "name": "Teacher", "type": "Staff", "level": "Standard",
+      "grants": {
+        "students": ["View"], "schoolclasses": ["View"], "subjects": ["View"], "timetableentries": ["View"],
+        "attendancerecords": ["View", "Create", "Edit"],
+        "assessments": ["View", "Create", "Edit"],
+        "results": ["View", "Create", "Edit"]
+      }
+    },
+    {
+      "name": "Registrar", "type": "Staff", "level": "Senior",
+      "grants": {
+        "students": ["View", "Create", "Edit"], "guardians": ["View", "Create", "Edit"],
+        "schoolclasses": ["View", "Create", "Edit"], "academicyears": ["View"], "teachers": ["View"]
+      }
+    },
+    {
+      "name": "Bursar", "type": "Staff", "level": "Senior",
+      "grants": {
+        "students": ["View"], "guardians": ["View"],
+        "feestructures": ["View", "Create", "Edit"], "invoices": ["View", "Create", "Edit"], "feepayments": ["View", "Create", "Edit"]
+      }
+    }
+  ],
+  "entities": [
+    {
+      "name": "AcademicYear",
+      "fields": [
+        { "name": "Name", "type": "String", "required": true, "maxLength": 50 },
+        { "name": "StartDate", "type": "Date", "required": true },
+        { "name": "EndDate", "type": "Date", "required": true },
+        { "name": "IsCurrent", "type": "Bool", "required": true }
+      ]
+    },
+    {
+      "name": "Teacher",
+      "fields": [
+        { "name": "FirstName", "type": "String", "required": true, "maxLength": 100 },
+        { "name": "LastName", "type": "String", "required": true, "maxLength": 100 },
+        { "name": "Email", "type": "Email", "maxLength": 200 },
+        { "name": "Phone", "type": "Phone", "maxLength": 30 },
+        { "name": "EmployeeNumber", "type": "String", "required": true, "unique": true, "maxLength": 30 },
+        { "name": "HireDate", "type": "Date" },
+        { "name": "IsActive", "type": "Bool", "required": true }
+      ]
+    },
+    {
+      "name": "Subject",
+      "fields": [
+        { "name": "Code", "type": "String", "required": true, "unique": true, "maxLength": 20 },
+        { "name": "Name", "type": "String", "required": true, "maxLength": 150 },
+        { "name": "Description", "type": "Text" }
+      ]
+    },
+    {
+      "name": "SchoolClass",
+      "fields": [
+        { "name": "Name", "type": "String", "required": true, "maxLength": 100 },
+        { "name": "Level", "type": "String", "required": true, "maxLength": 50 },
+        { "name": "Capacity", "type": "Int" }
+      ],
+      "relations": [
+        { "name": "AcademicYear", "targetEntity": "AcademicYear" },
+        { "name": "ClassTeacher", "targetEntity": "Teacher", "required": false }
+      ]
+    },
+    {
+      "name": "Student",
+      "fields": [
+        { "name": "FirstName", "type": "String", "required": true, "maxLength": 100 },
+        { "name": "LastName", "type": "String", "required": true, "maxLength": 100 },
+        { "name": "DateOfBirth", "type": "Date", "required": true },
+        { "name": "Gender", "type": "String", "maxLength": 20 },
+        { "name": "Email", "type": "Email", "maxLength": 200 },
+        { "name": "Phone", "type": "Phone", "maxLength": 30 },
+        { "name": "StudentNumber", "type": "String", "required": true, "unique": true, "maxLength": 30 },
+        { "name": "Address", "type": "Text" }
+      ],
+      "relations": [ { "name": "SchoolClass", "targetEntity": "SchoolClass", "required": false } ]
+    },
+    {
+      "name": "Guardian",
+      "fields": [
+        { "name": "FullName", "type": "String", "required": true, "maxLength": 200 },
+        { "name": "Phone", "type": "Phone", "required": true, "maxLength": 30 },
+        { "name": "Email", "type": "Email", "maxLength": 200 },
+        { "name": "Relationship", "type": "String", "maxLength": 50 }
+      ],
+      "relations": [ { "name": "Student", "targetEntity": "Student" } ]
+    },
+    {
+      "name": "TimetableEntry",
+      "fields": [
+        { "name": "Day", "type": "String", "required": true, "maxLength": 20 },
+        { "name": "StartTime", "type": "String", "required": true, "maxLength": 5 },
+        { "name": "EndTime", "type": "String", "required": true, "maxLength": 5 },
+        { "name": "Room", "type": "String", "maxLength": 50 }
+      ],
+      "relations": [
+        { "name": "SchoolClass", "targetEntity": "SchoolClass" },
+        { "name": "Subject", "targetEntity": "Subject" },
+        { "name": "Teacher", "targetEntity": "Teacher" }
+      ]
+    },
+    {
+      "name": "AttendanceRecord",
+      "fields": [
+        { "name": "Date", "type": "Date", "required": true },
+        { "name": "Status", "type": "String", "required": true, "maxLength": 20 },
+        { "name": "Remarks", "type": "String", "maxLength": 250 }
+      ],
+      "relations": [ { "name": "Student", "targetEntity": "Student" } ]
+    },
+    {
+      "name": "Assessment",
+      "fields": [
+        { "name": "Title", "type": "String", "required": true, "maxLength": 150 },
+        { "name": "Date", "type": "Date", "required": true },
+        { "name": "MaxScore", "type": "Decimal", "required": true },
+        { "name": "Weight", "type": "Decimal" }
+      ],
+      "relations": [
+        { "name": "SchoolClass", "targetEntity": "SchoolClass" },
+        { "name": "Subject", "targetEntity": "Subject" }
+      ]
+    },
+    {
+      "name": "Result",
+      "fields": [
+        { "name": "Score", "type": "Decimal", "required": true },
+        { "name": "Comment", "type": "String", "maxLength": 250 }
+      ],
+      "relations": [
+        { "name": "Assessment", "targetEntity": "Assessment" },
+        { "name": "Student", "targetEntity": "Student" }
+      ]
+    },
+    {
+      "name": "FeeStructure",
+      "fields": [
+        { "name": "Name", "type": "String", "required": true, "maxLength": 150 },
+        { "name": "Amount", "type": "Decimal", "required": true }
+      ],
+      "relations": [ { "name": "AcademicYear", "targetEntity": "AcademicYear", "required": false } ]
+    },
+    {
+      "name": "Invoice",
+      "fields": [
+        { "name": "Number", "type": "String", "required": true, "unique": true, "maxLength": 30 },
+        { "name": "IssuedOn", "type": "Date", "required": true },
+        { "name": "DueOn", "type": "Date", "required": true },
+        { "name": "Amount", "type": "Decimal", "required": true },
+        { "name": "Status", "type": "String", "required": true, "maxLength": 20 }
+      ],
+      "relations": [
+        { "name": "Student", "targetEntity": "Student" },
+        { "name": "FeeStructure", "targetEntity": "FeeStructure", "required": false }
+      ]
+    },
+    {
+      "name": "FeePayment",
+      "fields": [
+        { "name": "Amount", "type": "Decimal", "required": true },
+        { "name": "PaidOn", "type": "Date", "required": true },
+        { "name": "Method", "type": "String", "maxLength": 50 },
+        { "name": "Reference", "type": "String", "maxLength": 100 }
+      ],
+      "relations": [ { "name": "Invoice", "targetEntity": "Invoice" } ]
+    }
+  ]
+}

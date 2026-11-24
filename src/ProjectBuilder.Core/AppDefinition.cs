@@ -35,6 +35,18 @@ public sealed class RelationDefinition
     public bool Required { get; init; } = true;
 }
 
+/// <summary>
+/// A role a template ships with (needs access control). Grants map an entity's route (its plural, lowercase, e.g. "students")
+/// to the actions the role may do: View, Create, Edit, Delete. Admin and User always exist and cannot be redefined here.
+/// </summary>
+public sealed class RoleDefinition
+{
+    public required string Name { get; init; }
+    public string? Type { get; init; }
+    public string? Level { get; init; }
+    public Dictionary<string, List<string>> Grants { get; init; } = [];
+}
+
 public sealed class EntityDefinition
 {
     public required string Name { get; init; }
@@ -65,6 +77,9 @@ public sealed class AppDefinition
     /// The menu then comes from the modules and replaces the simple dynamic menu.
     /// </summary>
     public bool AccessControl { get; init; }
+
+    /// <summary>Extra roles created with their permissions on first run (only with access control).</summary>
+    public List<RoleDefinition> Roles { get; init; } = [];
 
     /// <summary>C# namespace / project name derived from <see cref="Name"/> (letters and digits only).</summary>
     [JsonIgnore]

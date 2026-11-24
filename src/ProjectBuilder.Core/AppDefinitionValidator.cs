@@ -36,6 +36,7 @@ public static partial class AppDefinitionValidator
     private const int MaxEntities = 100;
     private const int MaxFieldsPerEntity = 100;
     private const int MaxRelationsPerEntity = 50;
+    private const int MaxRoles = 20;
 
     [GeneratedRegex("^[A-Za-z][A-Za-z0-9]{0,63}$")]
     private static partial Regex IdentifierRegex();
@@ -88,8 +89,47 @@ public static partial class AppDefinitionValidator
                 if (!entityNames.Contains(r.TargetEntity))
                     errors.Add($"Relation '{e.Name}.{r.Name}' points to unknown entity '{r.TargetEntity}'.");
 
+        ValidateRoles(app, entityNames, errors);
         return errors;
     }
+
+    private static readonly string[] CrudActions = ["View", "Create", "Edit", "Delete"];
+
+    private static void ValidateRoles(AppDefinition app, HashSet<string> entityNames, List<string> errors)
+    {
+        if (app.Roles.Count == 0) return;
+        if (!app.AccessControl) { errors.Add("Roles need Access control to be switched on."); return; }
+        if (app.Roles.Count > MaxRoles) { errors.Add($"A system can start with at most {MaxRoles} extra roles."); return; }
+
+        var routes = app.Entities.Where(e => e.Name is not null)
+            .Select(e => Plural(e.Name).ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Admin", "User" };
+
+        foreach (var role in app.Roles)
+        {
+            if (string.IsNullOrWhiteSpace(role.Name) || role.Name.Length > 50 || !RoleNameRegex().IsMatch(role.Name))
+            { errors.Add($"Role '{role.Name}': use letters and spaces only (max 50)."); continue; }
+            if (!seen.Add(role.Name)) errors.Add($"Role '{role.Name}' is a duplicate or a built-in role (Admin and User always exist).");
+            if (role.Type is { Length: > 50 } || role.Level is { Length: > 50 }) errors.Add($"Role '{role.Name}': Type and Level are limited to 50 characters.");
+
+            foreach (var (route, actions) in role.Grants)
+            {
+                if (!routes.Contains(route)) { errors.Add($"Role '{role.Name}' grants access to unknown entity '{route}' (use the entity's plural in lowercase, e.g. students)."); continue; }
+                foreach (var action in actions)
+                    if (!CrudActions.Contains(action, StringComparer.OrdinalIgnoreCase))
+                        errors.Add($"Role '{role.Name}': '{action}' is not an action (use View, Create, Edit or Delete).");
+            }
+        }
+    }
+
+    /// <summary>The pluralisation used for routes; kept in step with the generator's Naming.Plural.</summary>
+    private static string Plural(string name) =>
+        name.EndsWith('y') && name.Length > 1 && !"aeiou".Contains(char.ToLowerInvariant(name[^2])) ? name[..^1] + "ies"
+        : name.EndsWith('s') || name.EndsWith("x") || name.EndsWith("ch") || name.EndsWith("sh") ? name + "es"
+        : name + "s";
+
+    [GeneratedRegex("^[A-Za-z][A-Za-z ]*$")]
+    private static partial Regex RoleNameRegex();
 
     private static bool CheckIdentifier(string? name, string what, List<string> errors)
     {

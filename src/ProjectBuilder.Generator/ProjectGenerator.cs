@@ -50,7 +50,10 @@ public sealed class ProjectGenerator
         var acSeed = app.AccessControl
             ? AccessControlSeed.Default(app).Select(m => new { m.Name, m.Slug, m.Icon, m.Order, m.ForUser, Subs = m.Subs.Select(s => new { s.Name, s.Key, s.Route, s.Icon, s.Order, Actions = s.Actions.ToList() }).ToList() }).ToList()
             : [];
-        files.Add(new("Data/DbSeeder.cs", Tpl.Render(Tpl.DbSeeder, new { Ns = ns, DynamicMenu = simpleMenu, app.AccessControl, MenuItems = menuSeed, Modules = acSeed })));
+        var extraRoles = app.AccessControl
+            ? AccessControlSeed.ExtraRoles(app).Select(r => new { r.Name, Type = r.Type ?? "", Level = r.Level ?? "", Grants = r.Grants.ToList() }).ToList()
+            : [];
+        files.Add(new("Data/DbSeeder.cs", Tpl.Render(Tpl.DbSeeder, new { Ns = ns, DynamicMenu = simpleMenu, app.AccessControl, MenuItems = menuSeed, Modules = acSeed, ExtraRoles = extraRoles })));
         if (app.AccessControl)
         {
             files.Add(new("Domain/AccessControl.cs", Tpl.Render(AcTpl.Domain, new { Ns = ns })));
