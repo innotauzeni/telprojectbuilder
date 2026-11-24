@@ -46,7 +46,8 @@ public static class OpenApiGenerator
             };
         }
 
-        if (app.DynamicMenu) AddMenu(schemas, paths);
+        if (app.DynamicMenu && !app.AccessControl) AddMenu(schemas, paths);
+        if (app.AccessControl) AddAccessControl(paths);
 
         var doc = new JsonObject
         {
@@ -57,6 +58,65 @@ public static class OpenApiGenerator
             ["components"] = new JsonObject { ["schemas"] = schemas }
         };
         return doc.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>Endpoints of the access-control feature (modules, sub-modules, permissions, roles). Bodies are shown as plain objects.</summary>
+    private static void AddAccessControl(JsonObject paths)
+    {
+        // (path, method, tag, summary, needs body, id-style path parameters)
+        (string Path, string Method, string Tag, string Summary, bool Body)[] ops =
+        [
+            ("/api/menu", "get", "Access control", "Menu for the current user (modules with sub-modules)", false),
+            ("/api/me/permissions", "get", "Access control", "Permissions of the current user", false),
+            ("/api/modules", "get", "Modules", "List system modules (Admin)", false),
+            ("/api/modules", "post", "Modules", "Add a module (Admin)", true),
+            ("/api/modules/{id}", "get", "Modules", "Get a module (Admin)", false),
+            ("/api/modules/{id}", "put", "Modules", "Update a module (Admin)", true),
+            ("/api/modules/{id}", "delete", "Modules", "Delete a module (Admin)", false),
+            ("/api/modules/{id}/roles", "get", "Modules", "Menu permission: roles that see this module (Admin)", false),
+            ("/api/modules/{id}/roles", "put", "Modules", "Menu permission: set the roles that see this module (Admin)", true),
+            ("/api/modules/{id}/submodules", "get", "Sub-modules", "List the sub-modules of a module (Admin)", false),
+            ("/api/modules/{id}/submodules", "post", "Sub-modules", "Add a sub-module (Admin)", true),
+            ("/api/submodules/{id}", "get", "Sub-modules", "Get a sub-module (Admin)", false),
+            ("/api/submodules/{id}", "put", "Sub-modules", "Update a sub-module (Admin)", true),
+            ("/api/submodules/{id}", "delete", "Sub-modules", "Delete a sub-module (Admin)", false),
+            ("/api/submodules/{id}/permissions", "get", "Permissions", "Permissions of a sub-module (Admin)", false),
+            ("/api/submodules/{id}/permissions", "post", "Permissions", "Add one permission (Admin)", true),
+            ("/api/submodules/{id}/permissions/bulk", "post", "Permissions", "Add permissions in bulk, e.g. View, Create, Edit, Delete (Admin)", true),
+            ("/api/permissions/{id}", "put", "Permissions", "Update a permission (Admin)", true),
+            ("/api/permissions/{id}", "delete", "Permissions", "Delete a permission (Admin)", false),
+            ("/api/access-tree", "get", "Permissions", "Modules, sub-modules and permissions in one tree (Admin)", false),
+            ("/api/roles", "get", "Roles", "List roles (Admin)", false),
+            ("/api/roles", "post", "Roles", "Add a role (Admin)", true),
+            ("/api/roles/{id}", "get", "Roles", "Get a role with its menus and permissions (Admin)", false),
+            ("/api/roles/{id}", "put", "Roles", "Update a role (Admin)", true),
+            ("/api/roles/{id}", "delete", "Roles", "Delete a role (Admin)", false),
+            ("/api/roles/{id}/menus", "put", "Roles", "Menu permission: set the menus of a role (Admin)", true),
+            ("/api/roles/{id}/permissions", "put", "Roles", "Role permission: set the permissions of a role (Admin)", true)
+        ];
+
+        foreach (var (path, method, tag, summary, body) in ops)
+        {
+            var op = new JsonObject
+            {
+                ["tags"] = new JsonArray(tag),
+                ["summary"] = summary,
+                ["responses"] = new JsonObject { ["200"] = new JsonObject { ["description"] = "OK" } }
+            };
+            if (path.Contains("{id}"))
+                op["parameters"] = new JsonArray(new JsonObject
+                {
+                    ["name"] = "id", ["in"] = "path", ["required"] = true, ["schema"] = new JsonObject { ["type"] = "string" }
+                });
+            if (body)
+                op["requestBody"] = new JsonObject
+                {
+                    ["required"] = true,
+                    ["content"] = new JsonObject { ["application/json"] = new JsonObject { ["schema"] = new JsonObject { ["type"] = "object" } } }
+                };
+            if (paths[path] is not JsonObject item) paths[path] = item = new JsonObject();
+            item[method] = op;
+        }
     }
 
     /// <summary>Menu endpoints that exist when the project has a dynamic menu.</summary>

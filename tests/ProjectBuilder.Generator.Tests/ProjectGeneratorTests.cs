@@ -16,7 +16,14 @@ public class ProjectGeneratorTests
     {
         var json = File.ReadAllText(TemplatePath("enrolment.json"));
         var app = AppDefinitionSerializer.FromJson(json);
-        return new AppDefinition { Name = app.Name, Database = db, Targets = app.Targets, DynamicMenu = app.DynamicMenu, Entities = app.Entities };
+        return new AppDefinition { Name = app.Name, Database = db, Targets = app.Targets, DynamicMenu = app.DynamicMenu, AccessControl = app.AccessControl, Entities = app.Entities };
+    }
+
+    /// <summary>The Enrolment system with the simple database menu (no roles/permissions screens).</summary>
+    public static AppDefinition EnrolmentSimpleMenu()
+    {
+        var app = Enrolment();
+        return new AppDefinition { Name = app.Name, Database = app.Database, Targets = app.Targets, DynamicMenu = true, AccessControl = false, Entities = app.Entities };
     }
 
     [Fact]

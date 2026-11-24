@@ -9,7 +9,7 @@ export interface EntityMeta {
   display: string; icon: string;
   fields: FieldMeta[]; relations: RelationMeta[];
 }
-interface MetaFile { appName: string; dynamicMenu: boolean; entities: EntityMeta[]; }
+interface MetaFile { appName: string; dynamicMenu: boolean; accessControl?: boolean; entities: EntityMeta[]; }
 
 /**
  * Describes the system (entities, fields, links). Generated into public/entities.json, so labels and fields
@@ -19,6 +19,8 @@ interface MetaFile { appName: string; dynamicMenu: boolean; entities: EntityMeta
 export class MetaService {
   readonly appName = signal('');
   readonly dynamicMenu = signal(false);
+  /** True when the system has modules, roles and permissions (the Administration screens). */
+  readonly accessControl = signal(false);
   readonly entities = signal<EntityMeta[]>([]);
 
   async load(): Promise<void> {
@@ -28,6 +30,7 @@ export class MetaService {
       const meta = (await res.json()) as MetaFile;
       this.appName.set(meta.appName);
       this.dynamicMenu.set(meta.dynamicMenu === true);
+      this.accessControl.set(meta.accessControl === true);
       this.entities.set(meta.entities ?? []);
       document.title = meta.appName;
     } catch {

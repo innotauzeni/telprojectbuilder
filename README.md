@@ -7,9 +7,9 @@ A Flutter mobile app is on the roadmap.
 
 > **Status: early alpha (Phase 1).** Working today: Studio designer, a live preview of the real web app and API, the
 > Enrolment template, API generation for SQLite / SQL Server / PostgreSQL with login and Admin/User roles, a modern
-> Angular web app (light/dark, responsive), an optional database-driven **dynamic menu**, Studio **accounts** (sign up,
-> private projects) and ZIP download.
-> Not yet: migrations, per-entity permissions, multi-language UI, email verification / password reset, Flutter app.
+> Angular web app (light/dark, responsive), optional **access control** (modules, sub-modules, permissions and roles,
+> enforced by the API) or a simpler **dynamic menu**, Studio **accounts** (sign up, private projects) and ZIP download.
+> Not yet: migrations, multi-language UI, email verification / password reset, Flutter app.
 > See the [roadmap](docs/ROADMAP.md) and [running the Studio online](#running-the-studio-for-other-people).
 
 ## Quick start
@@ -29,8 +29,14 @@ dotnet run --project src/ProjectBuilder.Studio --urls http://localhost:5230
 Open http://localhost:5230 → pick the **Enrolment System** template → tweak → **Preview** (your real web app running on a
 demo API, plus Swagger and the generated code) → **Download**.
 
-**Dynamic menu:** switch it on in the designer and the generated system gets a `MenuItems` table, `GET /api/menu`
-(filtered by the user's roles) and an Admin "Menu" screen to add, reorder, hide or remove entries without redeploying.
+**Access control:** switch it on in the designer and the generated system gets database tables for **system modules**
+(the menu), **sub-modules** (the submenu), **permissions** (like `students.create`), **roles** (with a Type and Level),
+**role menus** and **role permissions**. The web app gets Administration screens where tables have *View details*,
+*Menu permission* and *Role permission* actions, permissions can be added in bulk, and a role's menus and permissions are
+assigned on one page. The API enforces the permissions and each user's menu comes from the modules assigned to their roles.
+
+**Dynamic menu:** a lighter option (without roles and permissions): a `MenuItems` table, `GET /api/menu` filtered by the
+user's roles, and an Admin "Menu" screen to add, reorder, hide or remove entries without redeploying.
 
 Working on the Studio UI itself? Run `dotnet run` as above and, in `src/studio-web`, `npm start`
 (live reload at http://localhost:4200, proxied to the .NET server on port 5230).

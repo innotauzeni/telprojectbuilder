@@ -15,6 +15,8 @@ export interface AppDef {
   targets: string;
   /** Store the navigation menu in a database table (MenuItems), served per role and editable by admins. */
   dynamicMenu: boolean;
+  /** Modules (menu), sub-modules (submenu), permissions and roles, stored in the database and enforced by the API. */
+  accessControl: boolean;
   entities: EntityDef[];
 }
 

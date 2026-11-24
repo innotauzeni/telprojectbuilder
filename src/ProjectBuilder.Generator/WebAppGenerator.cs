@@ -60,7 +60,7 @@ public static class WebAppGenerator
             })
         });
 
-        return JsonSerializer.Serialize(new { appName = app.Name, dynamicMenu = app.DynamicMenu, entities },
+        return JsonSerializer.Serialize(new { appName = app.Name, dynamicMenu = app.DynamicMenu || app.AccessControl, accessControl = app.AccessControl, entities },
             new JsonSerializerOptions
             {
                 WriteIndented = true,

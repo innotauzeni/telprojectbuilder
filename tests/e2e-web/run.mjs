@@ -61,7 +61,7 @@ const web = createServer((req, res) => {
   res.end(readFileSync(file));
 }).listen(webPort, '127.0.0.1');
 
-let browser;
+let browser, page;
 async function cleanup(code) {
   try { await browser?.close(); } catch { /* ignore */ }
   web.close();
@@ -82,7 +82,7 @@ try {
   ok('generated API is up');
 
   browser = await puppeteer.launch({ executablePath: chromePath, headless: true, args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+  page = await browser.newPage();
   const problems = [];
   page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
@@ -97,9 +97,11 @@ try {
   }, value);
   const goTo = async (label) => { // click a menu entry and wait until that section has rendered
     await clickText('nav a', label);
-    await page.waitForFunction((l) => document.querySelector('h1')?.textContent.includes(l), {}, label);
+    await page.waitForFunction((l) => document.querySelector('h1')?.textContent.toLowerCase().includes(l.toLowerCase()), {}, label);
   };
   const clickLabel = async (label) => { await page.waitForSelector(`[aria-label="${label}"]`); await page.click(`[aria-label="${label}"]`); };
+  const clickTextExists = async (selector, label) =>
+    !!(await page.evaluateHandle((s, l) => [...document.querySelectorAll(s)].find((e) => e.textContent.trim().includes(l)), selector, label)).asElement();
   const clickText = async (selector, label) => {
     const h = await page.evaluateHandle((s, l) => [...document.querySelectorAll(s)].find((e) => e.textContent.trim().includes(l)), selector, label);
     const el = h.asElement();
@@ -124,8 +126,11 @@ try {
   ok('admin can log in and sees the menu');
   await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Dashboard'))); // menu loads after login
   const adminMenu = await page.$$eval('nav a', (a) => a.map((x) => x.textContent.trim()));
-  if (!adminMenu.includes('Menu') || !adminMenu.includes('Dashboard')) throw new Error('admin menu incomplete: ' + adminMenu.join(', '));
-  ok('admin sees the database-driven menu incl. the Admin-only Menu entry: ' + adminMenu.join(', '));
+  for (const want of ['Dashboard', 'Students', 'Guardians', 'Modules', 'Roles'])
+    if (!adminMenu.includes(want)) throw new Error('admin menu is missing "' + want + '": ' + adminMenu.join(', '));
+  const groups = await page.$$eval('nav .group', (g) => g.map((x) => x.textContent.trim()));
+  if (!groups.includes('Data') || !groups.includes('Administration')) throw new Error('menu groups missing: ' + groups.join(', '));
+  ok('admin sees the module menu (groups: ' + groups.join(', ') + ') with sub-modules: ' + adminMenu.join(', '));
 
   // a second, non-admin user for the role checks at the end
   const session = await page.evaluate(() => JSON.parse(localStorage.getItem('session')));
@@ -198,6 +203,74 @@ try {
   await bodyHas('No records yet');
   ok('admin can delete a record');
 
+  // ---- administration: modules, sub-modules, permissions and roles through the UI ----
+  await goTo('Modules');
+  await bodyHas('Administration');
+  await page.waitForSelector('tbody tr .actions-wrap a');
+  const actions = await page.$$eval('tbody tr:first-child .actions-wrap a', (a) => a.map((x) => x.textContent.trim()));
+  if (!actions.some((a) => a.includes('View details')) || !actions.some((a) => a.includes('Menu permission')))
+    throw new Error('module row actions missing: ' + actions.join(' | '));
+  ok('modules table has View details and Menu permission actions');
+
+  const rowAction = async (rowText, label) => {
+    const h = await page.evaluateHandle((r, l) => {
+      const row = [...document.querySelectorAll('tbody tr')].find((t) => t.textContent.includes(r));
+      return row && [...row.querySelectorAll('a,button')].find((b) => b.textContent.includes(l));
+    }, rowText, label);
+    const el = h.asElement();
+    if (!el) throw new Error('no "' + label + '" action on the row "' + rowText + '"');
+    await el.click();
+  };
+
+  await rowAction('Data', 'View details');
+  await page.waitForFunction(() => document.querySelector('h1')?.textContent.includes('Data'));
+  await page.waitForFunction(() => [...document.querySelectorAll('tbody tr')].some((t) => t.textContent.includes('Students'))); // sub-modules table loaded
+  await rowAction('Students', 'View details');
+  await bodyHas('students.view');
+  await bodyHas('students.delete');
+  ok('module -> sub-module -> its permissions (students.view ... students.delete)');
+
+  // add menu permissions in bulk: tick Export, type two more
+  await clickText('label.check', 'Export');
+  await setValue('input[aria-label="Other actions"]', 'Archive, Send Email');
+  await clickText('button.btn.primary', 'permission');
+  await bodyHas('students.export');
+  await bodyHas('students.send-email');
+  await bodyHas('students.archive');
+  ok('bulk-added permissions Export, Archive and Send Email to the Students sub-module');
+
+  await goTo('Roles');
+  await bodyHas('built-in');
+  await clickText('button.btn.primary', 'Add role');
+  await page.waitForSelector('#r-name');
+  await setValue('#r-name', 'Registrar');
+  await setValue('#r-type', 'Staff');
+  await clickText('.dialog button', 'Save');
+  await bodyHas('Registrar');
+  ok('created the Registrar role');
+
+  await rowAction('Registrar', 'Role permission');
+  await page.waitForSelector('#permissions');
+  await clickText('#menus label.check', 'Data');
+  await clickText('#permissions label.check', 'View Students');
+  await page.waitForFunction(() => !document.querySelector('.toast')); // let earlier toasts clear so we read this one
+  await clickText('button.btn.primary', 'Save menus and permissions');
+  await page.waitForSelector('.toast');
+  const savedToast = await page.$eval('.toast', (e) => e.innerText);
+  if (!savedToast.includes('Menus and permissions saved')) throw new Error('saving the role failed: ' + savedToast);
+  ok('assigned the Data menu and the View Students permission to Registrar on one page');
+
+  await page.goto(base + '/admin/roles', { waitUntil: 'networkidle0' });
+  await rowAction('Registrar', 'View details');
+  await bodyHas('View Students');
+  ok('role details show the assigned menu and permission');
+
+  const regRes = await fetch(`http://127.0.0.1:${apiPort}/api/auth/register`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + session.token },
+    body: JSON.stringify({ email: 'registrar@example.com', password: 'Regist#12345', role: 'Registrar' })
+  });
+  if (regRes.status !== 201) throw new Error('could not create the Registrar user: ' + regRes.status);
+
   // ---- logout ----
   await clickLabel('Log out');
   await page.waitForFunction(() => location.pathname === '/login');
@@ -213,11 +286,37 @@ try {
   await bodyHas('Students');
   await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Dashboard')));
   const clerkMenu = await page.$$eval('nav a', (a) => a.map((x) => x.textContent.trim()));
-  if (clerkMenu.includes('Menu')) throw new Error('a User must not see the Menu entry: ' + clerkMenu.join(', '));
-  ok('a User gets a smaller menu without the Admin-only entry: ' + clerkMenu.join(', '));
-  await page.goto(base + '/admin/menu', { waitUntil: 'networkidle0' });
-  await bodyHas('permission');
-  ok('a User opening the Menu editor is told they lack permission');
+  if (clerkMenu.includes('Modules') || clerkMenu.includes('Roles')) throw new Error('a User must not see Administration: ' + clerkMenu.join(', '));
+  if (!clerkMenu.includes('Students')) throw new Error('a User should see Students: ' + clerkMenu.join(', '));
+  ok('a User gets a smaller menu without Administration: ' + clerkMenu.join(', '));
+  await page.goto(base + '/admin/modules', { waitUntil: 'networkidle0' });
+  if (new URL(page.url()).pathname !== '/') throw new Error('a User opening Administration should be sent home, got ' + page.url());
+  ok('a User opening an Administration screen is sent back to the dashboard');
+  await page.goto(base + '/e/students', { waitUntil: 'networkidle0' });
+  await bodyHas('Ndlovu');
+  if (await page.$('[aria-label="Delete"]')) throw new Error('a User (no students.delete) must not see the Delete button');
+  ok('a User has no Delete button (the User role lacks students.delete)');
+  await clickLabel('Log out');
+
+  // ---- the custom Registrar role: only what it was given ----
+  await setValue('#email', 'registrar@example.com');
+  await setValue('#password', 'Regist#12345');
+  await page.click('button[type=submit]');
+  await page.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Students')));
+  await sleep(800); // let the menu finish loading for this user
+  const regMenu = await page.$$eval('nav a', (a) => a.map((x) => x.textContent.trim()));
+  if (regMenu.includes('Guardians') || regMenu.includes('Roles')) throw new Error('Registrar should only see Students: ' + regMenu.join(', '));
+  ok('Registrar sees only Dashboard and Students: ' + regMenu.join(', '));
+  await page.goto(base + '/e/students', { waitUntil: 'networkidle0' });
+  await bodyHas('Ndlovu');
+  if (await clickTextExists('a.btn', 'New Student')) throw new Error('Registrar (no students.create) must not see New Student');
+  if (await page.$('[aria-label="Edit"]') || await page.$('[aria-label="Delete"]')) throw new Error('Registrar must not see Edit or Delete');
+  await page.waitForSelector('[aria-label="View details"]');
+  ok('Registrar can view students but has no New, Edit or Delete buttons');
+  await clickLabel('View details');
+  await page.waitForSelector('#firstName');
+  if (!(await page.$eval('#firstName', (e) => e.matches(':disabled')))) throw new Error('the record should open read-only');
+  ok('a record opens read-only without the Edit permission');
   await clickLabel('Log out');
 
   const real = problems.filter((p) => !['400', '401', '403', '409'].some((c) => p.includes(c)));
@@ -228,5 +327,7 @@ try {
   await cleanup(0);
 } catch (e) {
   console.error('\n✘ FAILED at step ' + (step + 1) + ': ' + e.message);
+  try { console.error('--- toasts: ' + JSON.stringify(await page.$$eval('.toast', (t) => t.map((x) => x.innerText)))); } catch { /* page gone */ }
+  try { console.error('--- page at failure: ' + page?.url() + String.fromCharCode(10) + (await page.evaluate(() => document.body.innerText)).slice(0, 700)); } catch { /* page gone */ }
   await cleanup(1);
 }

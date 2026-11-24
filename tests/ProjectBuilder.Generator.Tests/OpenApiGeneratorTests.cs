@@ -15,6 +15,11 @@ public class OpenApiGeneratorTests
         Assert.NotNull(doc["paths"]!["/api/students"]!["post"]);
         Assert.NotNull(doc["paths"]!["/api/students/{id}"]!["delete"]);
 
+        // access control is on in the Enrolment template, so its admin endpoints are documented too
+        Assert.NotNull(doc["paths"]!["/api/roles/{id}/permissions"]!["put"]);
+        Assert.NotNull(doc["paths"]!["/api/submodules/{id}/permissions/bulk"]!["post"]);
+        Assert.NotNull(doc["paths"]!["/api/menu"]!["get"]);
+
         var student = doc["components"]!["schemas"]!["Student"]!;
         Assert.Contains("firstName", student["required"]!.AsArray().Select(x => (string?)x));
         Assert.Equal("uuid", (string?)doc["components"]!["schemas"]!["Enrolment"]!["properties"]!["studentId"]!["format"]);

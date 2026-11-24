@@ -26,13 +26,20 @@ internal static class Tpl
 
         namespace {{ Ns }}.Data;
 
-        public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<IdentityUser>(options)
+        public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<IdentityUser, Role, string>(options)
         {
         {{~ for e in Entities ~}}
             public DbSet<{{ e.Name }}> {{ e.Plural }} => Set<{{ e.Name }}>();
         {{~ end ~}}
         {{~ if DynamicMenu ~}}
             public DbSet<MenuItem> MenuItems => Set<MenuItem>();
+        {{~ end ~}}
+        {{~ if AccessControl ~}}
+            public DbSet<SystemModule> SystemModules => Set<SystemModule>();
+            public DbSet<Submodule> Submodules => Set<Submodule>();
+            public DbSet<Permission> Permissions => Set<Permission>();
+            public DbSet<RoleMenu> RoleMenus => Set<RoleMenu>();
+            public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
         {{~ end ~}}
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -47,6 +54,22 @@ internal static class Tpl
         {{~ for dec in e.DecimalFields ~}}
                 modelBuilder.Entity<{{ e.Name }}>().Property(x => x.{{ dec }}).HasPrecision(18, 2);
         {{~ end ~}}
+        {{~ end ~}}
+        {{~ if AccessControl ~}}
+                modelBuilder.Entity<SystemModule>().HasIndex(x => x.Slugname).IsUnique();
+                modelBuilder.Entity<Submodule>().HasOne(x => x.module).WithMany(m => m.childrens)
+                    .HasForeignKey(x => x.ModuleId).OnDelete(DeleteBehavior.Cascade);
+                modelBuilder.Entity<Permission>().HasIndex(x => x.Name).IsUnique();
+                modelBuilder.Entity<RoleMenu>().HasKey(x => new { x.RoleId, x.SystemModuleId });
+                modelBuilder.Entity<RoleMenu>().HasOne(x => x.Role).WithMany(r => r.RoleMenus)
+                    .HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+                modelBuilder.Entity<RoleMenu>().HasOne(x => x.Menu).WithMany(m => m.RoleMenus)
+                    .HasForeignKey(x => x.SystemModuleId).OnDelete(DeleteBehavior.Cascade);
+                modelBuilder.Entity<RolePermission>().HasKey(x => new { x.RoleId, x.PermissionId });
+                modelBuilder.Entity<RolePermission>().HasOne(x => x.Role).WithMany(r => r.RolePermissions)
+                    .HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+                modelBuilder.Entity<RolePermission>().HasOne(x => x.Permission).WithMany(p => p.RolePermissions)
+                    .HasForeignKey(x => x.PermissionId).OnDelete(DeleteBehavior.Cascade);
         {{~ end ~}}
             }
         }
@@ -93,6 +116,9 @@ internal static class Tpl
         using {{ Ns }}.Data;
         using {{ Ns }}.Domain;
         using {{ Ns }}.Dtos;
+        {{~ if AccessControl ~}}
+        using {{ Ns }}.Security;
+        {{~ end ~}}
 
         namespace {{ Ns }}.Controllers;
 
@@ -104,6 +130,9 @@ internal static class Tpl
             private const string SaveError = "Could not save: a unique value is duplicated or a linked record does not exist.";
 
             [HttpGet]
+        {{~ if AccessControl ~}}
+            [HasPermission("{{ Route }}.view")]
+        {{~ end ~}}
             public async Task<ActionResult<PagedResult<{{ Name }}Dto>>> List([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
             {
                 page = Math.Max(page, 1);
@@ -115,6 +144,9 @@ internal static class Tpl
             }
 
             [HttpGet("{id:guid}")]
+        {{~ if AccessControl ~}}
+            [HasPermission("{{ Route }}.view")]
+        {{~ end ~}}
             public async Task<ActionResult<{{ Name }}Dto>> Get(Guid id)
             {
                 var item = await db.{{ Plural }}.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
@@ -122,6 +154,9 @@ internal static class Tpl
             }
 
             [HttpPost]
+        {{~ if AccessControl ~}}
+            [HasPermission("{{ Route }}.create")]
+        {{~ end ~}}
             public async Task<ActionResult<{{ Name }}Dto>> Create({{ Name }}Dto dto)
             {
                 var item = new {{ Name }} { Id = Guid.NewGuid() };
@@ -133,6 +168,9 @@ internal static class Tpl
             }
 
             [HttpPut("{id:guid}")]
+        {{~ if AccessControl ~}}
+            [HasPermission("{{ Route }}.edit")]
+        {{~ end ~}}
             public async Task<IActionResult> Update(Guid id, {{ Name }}Dto dto)
             {
                 var item = await db.{{ Plural }}.FindAsync(id);
@@ -144,7 +182,11 @@ internal static class Tpl
             }
 
             [HttpDelete("{id:guid}")]
+        {{~ if AccessControl ~}}
+            [HasPermission("{{ Route }}.delete")]
+        {{~ else ~}}
             [Authorize(Roles = "Admin")]
+        {{~ end ~}}
             public async Task<IActionResult> Delete(Guid id)
             {
                 var item = await db.{{ Plural }}.FindAsync(id);
@@ -172,6 +214,7 @@ internal static class Tpl
         using Microsoft.AspNetCore.Mvc;
         using Microsoft.IdentityModel.JsonWebTokens;
         using Microsoft.IdentityModel.Tokens;
+        using {{ Ns }}.Domain;
 
         namespace {{ Ns }}.Controllers;
 
@@ -181,9 +224,8 @@ internal static class Tpl
 
         [ApiController]
         [Route("api/auth")]
-        public class AuthController(UserManager<IdentityUser> users, IConfiguration config) : ControllerBase
+        public class AuthController(UserManager<IdentityUser> users, RoleManager<Role> roles, IConfiguration config) : ControllerBase
         {
-            private static readonly string[] AllowedRoles = ["Admin", "User"];
 
             /// <summary>Log in and receive a JWT. In Swagger, click Authorize and paste the token.</summary>
             [HttpPost("login")]
@@ -209,7 +251,7 @@ internal static class Tpl
             [Authorize(Roles = "Admin")]
             public async Task<IActionResult> Register(RegisterRequest request)
             {
-                if (!AllowedRoles.Contains(request.Role)) return BadRequest("Role must be Admin or User.");
+                if (!await roles.RoleExistsAsync(request.Role)) return BadRequest("Unknown role.");
                 var user = new IdentityUser { UserName = request.Email, Email = request.Email, EmailConfirmed = true };
                 var result = await users.CreateAsync(user, request.Password);
                 if (!result.Succeeded) return BadRequest(result.Errors.Select(e => e.Description));
@@ -380,9 +422,9 @@ internal static class Tpl
         {
             public static async Task SeedAsync(IServiceProvider services, IConfiguration config)
             {
-                var roles = services.GetRequiredService<RoleManager<IdentityRole>>();
+                var roles = services.GetRequiredService<RoleManager<Role>>();
                 foreach (var role in new[] { "Admin", "User" })
-                    if (!await roles.RoleExistsAsync(role)) await roles.CreateAsync(new IdentityRole(role));
+                    if (!await roles.RoleExistsAsync(role)) await roles.CreateAsync(new Role { Name = role, Type = "System", Level = role == "Admin" ? "Administrator" : "Standard" });
         {{~ if DynamicMenu ~}}
 
                 var db = services.GetRequiredService<AppDbContext>();
@@ -393,6 +435,50 @@ internal static class Tpl
                         new MenuItem { Id = Guid.NewGuid(), Label = "{{ m.Label }}", Route = "{{ m.Route }}", Icon = "{{ m.Icon }}", SortOrder = {{ m.SortOrder }}, Roles = {{ if m.Roles == "" }}null{{ else }}"{{ m.Roles }}"{{ end }}, IsVisible = true }{{ if for.last }});{{ else }},{{ end }}
         {{~ end ~}}
                     await db.SaveChangesAsync();
+                }
+        {{~ end ~}}
+        {{~ if AccessControl ~}}
+
+                var acdb = services.GetRequiredService<AppDbContext>();
+                if (!await acdb.SystemModules.AnyAsync())
+                {
+                    // system modules (menu) -> sub-modules (submenu) -> permissions. The User role gets the "Data" menu and every
+                    // permission except Delete; Admin needs no grants because it always has everything.
+                    var userRole = await roles.FindByNameAsync("User");
+                    var data = new (string Name, string Slug, string Icon, int Order, bool ForUser, (string Name, string Key, string Route, string Icon, int Order, string[] Actions)[] Subs)[]
+                    {
+        {{~ for m in Modules ~}}
+                        ("{{ m.Name }}", "{{ m.Slug }}", "{{ m.Icon }}", {{ m.Order }}, {{ if m.ForUser }}true{{ else }}false{{ end }}, new (string, string, string, string, int, string[])[]
+                        {
+        {{~ for s in m.Subs ~}}
+                            ("{{ s.Name }}", "{{ s.Key }}", "{{ s.Route }}", "{{ s.Icon }}", {{ s.Order }}, new string[] { {{ for a in s.Actions }}"{{ a }}"{{ if !for.last }}, {{ end }}{{ end }} }),
+        {{~ end ~}}
+                        }),
+        {{~ end ~}}
+                    };
+
+                    foreach (var m in data)
+                    {
+                        var module = new SystemModule { Name = m.Name, Slugname = m.Slug, Icon = m.Icon, AccessName = m.Slug, SortOrder = m.Order };
+                        acdb.SystemModules.Add(module);
+                        if (userRole is not null && m.ForUser) acdb.RoleMenus.Add(new RoleMenu { Role = userRole, Menu = module });
+
+                        foreach (var s in m.Subs)
+                        {
+                            acdb.Submodules.Add(new Submodule { module = module, Name = s.Name, Icon = s.Icon, Route = s.Route, AccessName = s.Key, Order = s.Order });
+                            foreach (var action in s.Actions)
+                            {
+                                var permission = new Permission
+                                {
+                                    Name = s.Key + "." + action.ToLowerInvariant(), DisplayName = action + " " + s.Name, Module = s.Name
+                                };
+                                acdb.Permissions.Add(permission);
+                                if (userRole is not null && m.ForUser && action != "Delete")
+                                    acdb.RolePermissions.Add(new RolePermission { Role = userRole, Permission = permission });
+                            }
+                        }
+                    }
+                    await acdb.SaveChangesAsync();
                 }
         {{~ end ~}}
 
@@ -419,6 +505,7 @@ internal static class Tpl
         using Microsoft.IdentityModel.Tokens;
         using Microsoft.OpenApi.Models;
         using {{ Ns }}.Data;
+        using {{ Ns }}.Domain;
 
         var builder = WebApplication.CreateBuilder(args);
 
@@ -431,7 +518,7 @@ internal static class Tpl
                 o.Lockout.MaxFailedAccessAttempts = 5;
                 o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
             })
-            .AddRoles<IdentityRole>()
+            .AddRoles<Role>()
             .AddEntityFrameworkStores<AppDbContext>();
 
         var jwt = builder.Configuration.GetSection("Jwt");
@@ -450,6 +537,13 @@ internal static class Tpl
             };
         });
         builder.Services.AddAuthorization();
+        {{~ if AccessControl ~}}
+        // Role permissions: [HasPermission("students.create")] is checked against the database (cached for a few seconds).
+        builder.Services.AddMemoryCache();
+        builder.Services.AddScoped<{{ Ns }}.Security.PermissionService>();
+        builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationPolicyProvider, {{ Ns }}.Security.PermissionPolicyProvider>();
+        builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, {{ Ns }}.Security.PermissionHandler>();
+        {{~ end ~}}
 
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();

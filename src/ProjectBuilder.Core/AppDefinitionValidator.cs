@@ -26,6 +26,9 @@ public static partial class AppDefinitionValidator
             // generated infrastructure
             "DbSeeder", "PagedResult", "LoginRequest", "RegisterRequest", "AuthResponse", "Auth", "AuthController",
             "Menu", "MenuItem", "MenuEntry", "MenuItemDto", "MenuController",
+            // access control tables and types
+            "SystemModule", "SubModule", "Module", "Permission", "RolePermission", "PermissionService", "PermissionHandler",
+            "PermissionRequirement", "HasPermission", "AccessControlController",
             // ASP.NET Identity types / DbSet names inherited from IdentityDbContext
             "IdentityUser", "IdentityRole", "User", "Role", "UserClaim", "UserLogin", "UserToken", "RoleClaim", "UserRole"
         };

@@ -33,9 +33,11 @@ public static class PreviewApi
         g.MapGet("/preview/{id:guid}/swagger", (Guid id) => Results.Content(SwaggerHtml(id), "text/html"));
 
         MapWebApp(g, app.Environment.WebRootPath ?? "");
+        PreviewAccess.Map(g);
 
         // Menu for the previewed user (the preview user is an Admin, so every visible entry is shown).
         g.MapGet("/preview/{id:guid}/api/menu", (Guid id, ClaimsPrincipal u, ProjectStore s) =>
+            s.Get(Uid(u), id)?.AccessControl == true ? PreviewAccess.Menu(s, u, id) :
             With(s, Uid(u), id, MenuRoute, (e, list) =>
             {
                 lock (list)

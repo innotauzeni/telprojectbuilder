@@ -70,9 +70,14 @@ import { Icon } from '../ui/icon';
               <div><div class="t">Angular web app</div><div class="muted small">Modern admin UI with dark mode, ready to deploy.</div></div>
               <span class="switch"></span>
             </div>
-            <div class="tile" [class.on]="d.dynamicMenu" (click)="toggleMenu()" role="switch" [attr.aria-checked]="d.dynamicMenu" tabindex="0" (keydown.enter)="toggleMenu()" (keydown.space)="toggleMenu()">
+            <div class="tile" [class.on]="d.accessControl" (click)="toggleAccess()" role="switch" [attr.aria-checked]="d.accessControl" tabindex="0" (keydown.enter)="toggleAccess()" (keydown.space)="toggleAccess()">
+              <span class="ico"><app-icon name="shield" /></span>
+              <div><div class="t">Access control</div><div class="muted small">Modules (menu), sub-modules (submenu), permissions and roles, managed by admins and enforced by the API.</div></div>
+              <span class="switch"></span>
+            </div>
+            <div class="tile" [class.on]="d.dynamicMenu || d.accessControl" [class.locked]="d.accessControl" (click)="toggleMenu()" role="switch" [attr.aria-checked]="d.dynamicMenu || d.accessControl" tabindex="0" (keydown.enter)="toggleMenu()" (keydown.space)="toggleMenu()">
               <span class="ico"><app-icon name="list" /></span>
-              <div><div class="t">Dynamic menu</div><div class="muted small">Menu stored in a database table; admins edit it without redeploying.</div></div>
+              <div><div class="t">Dynamic menu</div><div class="muted small">{{ d.accessControl ? 'Included: the menu comes from the modules.' : 'Menu stored in a database table; admins edit it without redeploying.' }}</div></div>
               <span class="switch"></span>
             </div>
             <div class="tile" [class.on]="has('Docker')" (click)="toggle('Docker')" role="switch" [attr.aria-checked]="has('Docker')" tabindex="0" (keydown.enter)="toggle('Docker')" (keydown.space)="toggle('Docker')">
@@ -86,7 +91,10 @@ import { Icon } from '../ui/icon';
               <span class="badge">Soon</span>
             </div>
           </div>
-          @if (d.dynamicMenu) {
+          @if (d.accessControl) {
+            <p class="hint" style="margin-top:.75rem"><app-icon name="check" [size]="12" /> Tables <b>SystemModules</b>, <b>Submodules</b>, <b>Permissions</b>, <b>RoleMenus</b> and <b>RolePermissions</b>
+              are created, with the <b>Role</b> table extended by Type and Level. Every entity gets View / Create / Edit / Delete permissions that the API enforces{{ has('WebApp') ? ', and the web app gets Administration screens for modules, sub-modules, roles and bulk permissions.' : '. Turn on the Angular web app to get the admin screens.' }}</p>
+          } @else if (d.dynamicMenu) {
             <p class="hint" style="margin-top:.75rem"><app-icon name="check" [size]="12" /> A <b>MenuItems</b> table and the <code>/api/menu</code> endpoints will be created
               {{ has('WebApp') ? 'and the web app gets a Menu editor for admins.' : '. Turn on the Angular web app to get the editor screen.' }}</p>
           }
@@ -191,6 +199,7 @@ export class DesignerPage {
     try {
       const d = await this.api.get(id);
       d.dynamicMenu = d.dynamicMenu === true;
+      d.accessControl = d.accessControl === true;
       this.def.set(d);
       this.dirty.set(false);
       await this.validate();
@@ -210,7 +219,15 @@ export class DesignerPage {
 
   protected toggleMenu() {
     const d = this.def()!;
+    if (d.accessControl) return; // included in access control
     d.dynamicMenu = !d.dynamicMenu;
+    this.changed();
+  }
+
+  protected toggleAccess() {
+    const d = this.def()!;
+    d.accessControl = !d.accessControl;
+    if (d.accessControl) d.dynamicMenu = false; // the module menu replaces the simple dynamic menu
     this.changed();
   }
 

@@ -103,10 +103,10 @@ try {
   ok('template opens in the designer');
 
   const tiles = await page.$$eval('.tile', (t) => t.map((x) => ({ text: x.innerText, on: x.classList.contains('on') })));
-  const menuTile = tiles.find((t) => t.text.includes('Dynamic menu'));
+  const menuTile = tiles.find((t) => t.text.includes('Access control'));
   const webTile = tiles.find((t) => t.text.includes('Angular web app'));
-  if (!menuTile?.on || !webTile?.on) throw new Error('Angular web app and Dynamic menu should be on for this template');
-  ok('designer shows Angular web app and Dynamic menu switched on');
+  if (!menuTile?.on || !webTile?.on) throw new Error('Angular web app and Access control should be on for this template');
+  ok('designer shows Angular web app and Access control switched on');
 
   // ---- validation feedback ----
   await setValue(page, '#name', '');
@@ -135,9 +135,9 @@ try {
   await frame.waitForSelector('nav a');
   await bodyHas(frame, 'Dashboard');
   const menu = await frame.$$eval('nav a', (a) => a.map((x) => x.textContent.trim()));
-  for (const want of ['Dashboard', 'Students', 'Guardians', 'Payments', 'Menu'])
+  for (const want of ['Dashboard', 'Students', 'Guardians', 'Payments', 'Modules', 'Roles'])
     if (!menu.some((m) => m.includes(want))) throw new Error(`menu is missing "${want}": ${menu.join(', ')}`);
-  ok('preview opens on the REAL web app with the dynamic menu: ' + menu.join(', '));
+  ok('preview opens on the REAL web app with the module menu: ' + menu.join(', '));
 
   // ---- use the web app inside the preview ----
   await clickText(frame, 'nav a', 'Students');
@@ -153,35 +153,60 @@ try {
   await bodyHas(frame, 'Tendai');
   ok('create a student inside the preview web app');
 
-  // ---- dynamic menu editing in the preview ----
-  await clickText(frame, 'nav a', 'Menu');
-  await frame.waitForSelector('input[aria-label="Label"]');
-  await frame.waitForFunction(() => document.querySelectorAll('input[aria-label="Label"]').length >= 8);
-  const labels = await frame.$$eval('input[aria-label="Label"]', (i) => i.map((x) => x.value));
-  const idx = labels.indexOf('Students');
-  if (idx < 0) throw new Error('menu editor does not list Students: ' + labels.join(', '));
-  const inputs = await frame.$$('input[aria-label="Label"]');
-  await inputs[idx].click({ clickCount: 3 });
-  await inputs[idx].type('Learners');
-  const rows = await frame.$$('tbody tr');
-  await (await rows[idx].$('button.btn.primary')).click();
-  await frame.waitForFunction(() => [...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Learners')));
-  ok('rename a menu entry in the Menu editor: sidebar updates immediately');
+  // ---- access control inside the preview: modules -> sub-modules -> permissions, roles ----
+  const rowAction = async (row, label) => {
+    const h = await frame.evaluateHandle((r, l) => {
+      const tr = [...document.querySelectorAll('tbody tr')].find((t) => t.textContent.includes(r));
+      return tr && [...tr.querySelectorAll('a,button')].find((b) => b.textContent.includes(l));
+    }, row, label);
+    const el = h.asElement();
+    if (!el) throw new Error('no "' + label + '" on the row "' + row + '"');
+    await el.click();
+  };
+  const heading = (text) => frame.waitForFunction((t) => document.querySelector('h1')?.textContent.toLowerCase().includes(t.toLowerCase()), {}, text);
 
-  // hide an entry
-  const rows2 = await frame.$$('tbody tr');
-  const guardianIdx = (await frame.$$eval('input[aria-label="Label"]', (i) => i.map((x) => x.value))).indexOf('Guardians');
-  await (await rows2[guardianIdx].$('input[type=checkbox]')).click();
-  await (await rows2[guardianIdx].$('button.btn.primary')).click();
-  await frame.waitForFunction(() => ![...document.querySelectorAll('nav a')].some((a) => a.textContent.includes('Guardians')));
-  ok('hide a menu entry: it disappears from the sidebar');
+  await clickText(frame, 'nav a', 'Modules');
+  await heading('System modules');
+  await frame.waitForSelector('tbody tr .actions-wrap a');
+  await bodyHas(frame, 'Administration');
+  ok('Administration > Modules lists the system modules (Data, Administration)');
+
+  await rowAction('Data', 'View details');
+  await heading('Data');
+  await frame.waitForFunction(() => [...document.querySelectorAll('tbody tr')].some((t) => t.textContent.includes('Students')));
+  await rowAction('Students', 'View details');
+  await bodyHas(frame, 'students.view');
+  ok('module -> sub-module -> permissions (students.view ...)');
+
+  await clickText(frame, 'label.check', 'Export');
+  await setValue(frame, 'input[aria-label="Other actions"]', 'Archive');
+  await clickText(frame, 'button.btn.primary', 'permission');
+  await bodyHas(frame, 'students.export');
+  await bodyHas(frame, 'students.archive');
+  ok('permissions added in bulk to the Students sub-module');
+
+  await clickText(frame, 'nav a', 'Roles');
+  await heading('Roles');
+  await bodyHas(frame, 'built-in');
+  await clickText(frame, 'button.btn.primary', 'Add role');
+  await frame.waitForSelector('#r-name');
+  await setValue(frame, '#r-name', 'Registrar');
+  await clickText(frame, '.dialog button', 'Save');
+  await bodyHas(frame, 'Registrar');
+  await rowAction('Registrar', 'Role permission');
+  await frame.waitForSelector('#permissions');
+  await clickText(frame, '#menus label.check', 'Data');
+  await clickText(frame, '#permissions label.check', 'View Students');
+  await clickText(frame, 'button.btn.primary', 'Save menus and permissions');
+  await frame.waitForFunction(() => [...document.querySelectorAll('.toast')].some((t) => t.innerText.includes('Menus and permissions saved')));
+  ok('created a role and assigned a menu and a permission on one page');
 
   // ---- other preview tabs + device switch ----
   await clickText(page, '.seg button', 'Files');
   await bodyHas(page, 'api/Controllers/StudentsController.cs');
   await clickText(page, 'button.btn', 'api/Data/DbSeeder.cs');
-  await bodyHas(page, 'MenuItems');
-  ok('Files tab lists generated code, including the MenuItems seeding');
+  await bodyHas(page, 'SystemModules');
+  ok('Files tab lists generated code, including the access-control seeding');
 
   await clickText(page, '.seg button', 'API (Swagger)');
   await page.waitForSelector('iframe[title="API preview"]');
@@ -190,7 +215,7 @@ try {
   await clickText(page, '.seg button', 'Web app');
   await page.waitForSelector('.browser');
   await page.click('button[aria-label="Phone"]');
-  await page.waitForFunction(() => document.querySelector('.browser').getBoundingClientRect().width < 420); // width animates
+  await page.waitForFunction(() => document.querySelector('.browser').getBoundingClientRect().width <= 410); // width animates
   const w = await page.$eval('.browser', (e) => e.getBoundingClientRect().width);
   if (w > 420) throw new Error('phone preview should be ~390px wide, was ' + w);
   ok('phone preview narrows the browser frame to ' + Math.round(w) + 'px');

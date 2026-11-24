@@ -59,6 +59,13 @@ public sealed class AppDefinition
     /// </summary>
     public bool DynamicMenu { get; init; }
 
+    /// <summary>
+    /// When true the generated system gets role-based access control: system modules (menu), sub-modules (submenu),
+    /// permissions, roles and role permissions, all stored in the database, managed from admin screens, and enforced by the API.
+    /// The menu then comes from the modules and replaces the simple dynamic menu.
+    /// </summary>
+    public bool AccessControl { get; init; }
+
     /// <summary>C# namespace / project name derived from <see cref="Name"/> (letters and digits only).</summary>
     [JsonIgnore]
     public string Namespace => new string(Name.Where(char.IsAsciiLetterOrDigit).ToArray());

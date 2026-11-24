@@ -40,23 +40,35 @@ public sealed class ProjectGenerator
             DecimalFields = e.Fields.Where(f => f.Type == FieldType.Decimal).Select(f => f.Name).ToList()
         }).ToList();
 
-        files.Add(new("Data/AppDbContext.cs", Tpl.Render(Tpl.DbContext, new { Ns = ns, Entities = entities, app.DynamicMenu })));
+        // With access control the menu comes from the modules, so the simple database menu is only used without it.
+        var simpleMenu = app.DynamicMenu && !app.AccessControl;
+        files.Add(new("Domain/Role.cs", Tpl.Render(AcTpl.RoleEntity, new { Ns = ns, app.AccessControl })));
+        files.Add(new("Data/AppDbContext.cs", Tpl.Render(Tpl.DbContext, new { Ns = ns, Entities = entities, DynamicMenu = simpleMenu, app.AccessControl })));
         files.Add(new("PagedResult.cs", Tpl.Render(Tpl.PagedResult, new { Ns = ns })));
         files.Add(new("Controllers/AuthController.cs", Tpl.Render(Tpl.AuthController, new { Ns = ns })));
-        var menuSeed = app.DynamicMenu ? MenuSeed.Default(app).ToList() : [];
-        files.Add(new("Data/DbSeeder.cs", Tpl.Render(Tpl.DbSeeder, new { Ns = ns, app.DynamicMenu, MenuItems = menuSeed })));
-        if (app.DynamicMenu)
+        var menuSeed = simpleMenu ? MenuSeed.Default(app).ToList() : [];
+        var acSeed = app.AccessControl
+            ? AccessControlSeed.Default(app).Select(m => new { m.Name, m.Slug, m.Icon, m.Order, m.ForUser, Subs = m.Subs.Select(s => new { s.Name, s.Key, s.Route, s.Icon, s.Order, Actions = s.Actions.ToList() }).ToList() }).ToList()
+            : [];
+        files.Add(new("Data/DbSeeder.cs", Tpl.Render(Tpl.DbSeeder, new { Ns = ns, DynamicMenu = simpleMenu, app.AccessControl, MenuItems = menuSeed, Modules = acSeed })));
+        if (app.AccessControl)
+        {
+            files.Add(new("Domain/AccessControl.cs", Tpl.Render(AcTpl.Domain, new { Ns = ns })));
+            files.Add(new("Security/PermissionService.cs", Tpl.Render(AcTpl.Infrastructure, new { Ns = ns })));
+            files.Add(new("Controllers/AccessControlController.cs", Tpl.Render(AcTpl.Controller, new { Ns = ns })));
+        }
+        if (simpleMenu)
         {
             files.Add(new("Domain/MenuItem.cs", Tpl.Render(Tpl.MenuItem, new { Ns = ns })));
             files.Add(new("Controllers/MenuController.cs", Tpl.Render(Tpl.MenuController, new { Ns = ns })));
         }
         foreach (var e in entities)
             files.Add(new($"Controllers/{e.Plural}Controller.cs",
-                Tpl.Render(Tpl.Controller, new { Ns = ns, e.Name, e.Plural, Route = e.Plural.ToLowerInvariant() })));
+                Tpl.Render(Tpl.Controller, new { Ns = ns, e.Name, e.Plural, Route = e.Plural.ToLowerInvariant(), app.AccessControl })));
         foreach (var def in app.Entities)
             files.Add(new($"Dtos/{def.Name}Dto.cs", Tpl.Render(Tpl.Dto, new { Ns = ns, def.Name, Props = DtoProps(def) })));
 
-        files.Add(new("Program.cs", Tpl.Render(Tpl.Program, new { Ns = ns, UseCall = useCall })));
+        files.Add(new("Program.cs", Tpl.Render(Tpl.Program, new { Ns = ns, UseCall = useCall, app.AccessControl })));
         files.Add(new($"{ns}.csproj", Tpl.Render(Tpl.Csproj, new { Ns = ns, ProviderPackage = package, ProviderVersion = version })));
         var jwtKey = _realSecrets ? Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)) : "PREVIEW-ONLY-the-real-key-is-generated-on-download";
         // Aa1! guarantees Identity's default password rules; the hex tail is 64 bits of randomness.
@@ -254,6 +266,17 @@ public sealed class ProjectGenerator
         sb.AppendLine("2. In Swagger call `POST /api/auth/login`, copy the `token`, click **Authorize** and paste it.");
         sb.AppendLine("3. Admins can create more users with `POST /api/auth/register` (role `Admin` or `User`). Only Admins can delete records.");
         sb.AppendLine();
+        if (app.AccessControl)
+        {
+            sb.AppendLine("## Roles, menus and permissions");
+            sb.AppendLine("Access is managed in the database and from the web app's **Administration** screens (Admins only):");
+            sb.AppendLine("- **System modules** are the main menu; each has **sub-modules** (the submenu, one per screen). Open a module to see its sub-modules, and a sub-module to see its permissions.");
+            sb.AppendLine("- A **permission** is named like `students.create`. Add several to a sub-module at once with *Add permissions in bulk*. Every entity starts with View, Create, Edit and Delete.");
+            sb.AppendLine("- **Roles** hold the permissions. *Menu permission* decides which menus a role sees; *Role permission* decides what it may do. Both can be assigned together on a role's assign page.");
+            sb.AppendLine("- The API enforces the permissions (`[HasPermission(\"students.delete\")]`), and the menu is built from the modules assigned to the user's roles. Admin can always do everything.");
+            sb.AppendLine("- The built-in **User** role starts with every permission except Delete. Give a user a role when you register them: `POST /api/auth/register` with the role name.");
+            sb.AppendLine();
+        }
         sb.AppendLine("## Entities");
         foreach (var e in app.Entities)
             sb.AppendLine($"- {e.Name}  ->  /api/{Naming.Plural(e.Name).ToLowerInvariant()}");

@@ -52,7 +52,7 @@ type Device = 'desktop' | 'tablet' | 'mobile';
         @case ('web') {
           <div class="alert info"><app-icon name="sparkles" />
             <span>This is your <strong>real web app</strong> running against a temporary demo API: add, edit and delete records and try the
-            menu{{ def()?.dynamicMenu ? ' (including the Admin “Menu” editor)' : '' }}. Nothing here is saved to the download.</span></div>
+            menu{{ def()?.accessControl ? ' (including the Administration screens: modules, sub-modules, roles and permissions)' : def()?.dynamicMenu ? ' (including the Admin “Menu” editor)' : '' }}. Nothing here is saved to the download.</span></div>
           <div class="browser" [style.max-width]="width()">
             <div class="bar">
               <span class="dot"></span><span class="dot"></span><span class="dot"></span>

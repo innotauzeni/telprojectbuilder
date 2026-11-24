@@ -16,7 +16,11 @@ public class GeneratedWebAppTests
 
         var entities = files.Single(f => f.Path == "web/public/entities.json").Content;
         Assert.Contains("\"appName\": \"Enrolment System\"", entities);
-        Assert.Contains("\"dynamicMenu\": true", entities);
+        Assert.Contains("\"accessControl\": true", entities);
+        Assert.Contains(files, x => x.Path == "web/src/app/pages/access/roles.ts");
+        Assert.Contains(files, x => x.Path == "api/Controllers/AccessControlController.cs");
+        Assert.Contains(files, x => x.Path == "api/Domain/AccessControl.cs" && x.Content.Contains("class Submodule") && x.Content.Contains("childrens"));
+        Assert.Contains(files, x => x.Path == "api/Domain/Role.cs" && x.Content.Contains("RoleMenus"));
         Assert.Contains("\"route\": \"students\"", entities);
         Assert.Contains("\"icon\": \"graduation-cap\"", entities);
         Assert.Contains("\"label\": \"Date Of Birth\"", entities);

@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 import { ApiService, Row } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { EntityMeta, MetaService } from '../core/meta.service';
 import { ToastService } from '../core/toast.service';
 import { Icon } from '../ui/icon';
@@ -28,6 +29,8 @@ import { Icon } from '../ui/icon';
           </div>
         } @else {
           <form class="card" (ngSubmit)="save(m)">
+            @if (readOnly(m)) { <div class="alert info"><app-icon name="eye" /> You can view this record but not change it.</div> }
+            <fieldset [disabled]="readOnly(m)" style="border:0;padding:0;margin:0;min-width:0">
             <div class="form-grid">
               @for (f of m.fields; track f.key) {
                 <div [class.full]="f.type === 'Text'">
@@ -60,9 +63,12 @@ import { Icon } from '../ui/icon';
                 </div>
               }
             </div>
+            </fieldset>
             <div class="row" style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid var(--border); justify-content:flex-end">
-              <a class="btn" [routerLink]="['/e', m.route]">Cancel</a>
-              <button class="btn primary" type="submit" [disabled]="busy()"><app-icon name="check" [size]="16" /> {{ busy() ? 'Saving…' : 'Save' }}</button>
+              <a class="btn" [routerLink]="['/e', m.route]">{{ readOnly(m) ? 'Back' : 'Cancel' }}</a>
+              @if (!readOnly(m)) {
+                <button class="btn primary" type="submit" [disabled]="busy()"><app-icon name="check" [size]="16" /> {{ busy() ? 'Saving…' : 'Save' }}</button>
+              }
             </div>
           </form>
         }
@@ -80,8 +86,11 @@ export class EntityFormPage {
   private readonly router = inject(Router);
   private readonly metaService = inject(MetaService);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
 
   protected readonly meta = computed(() => this.metaService.byRoute(this.entity()));
+  /** Opening a record without the Edit permission (or starting a new one without Create) shows it read-only. */
+  protected readOnly(m: EntityMeta) { return !this.auth.can(m.route + (this.id() ? '.edit' : '.create')); }
   protected model: Row = {};
   protected readonly options = signal<Record<string, { id: string; text: string }[]>>({});
   protected readonly error = signal('');

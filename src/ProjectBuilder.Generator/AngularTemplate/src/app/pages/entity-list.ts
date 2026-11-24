@@ -23,7 +23,9 @@ import { Icon } from '../ui/icon';
             <span style="position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--muted)"><app-icon name="search" [size]="16" /></span>
             <input type="text" placeholder="Filter this page…" aria-label="Filter rows" style="padding-left:2.1rem" (input)="filter.set($any($event.target).value)" />
           </div>
-          <a class="btn primary" [routerLink]="['/e', m.route, 'new']"><app-icon name="plus" [size]="16" /> New {{ m.label }}</a>
+          @if (auth.can(m.route + '.create')) {
+            <a class="btn primary" [routerLink]="['/e', m.route, 'new']"><app-icon name="plus" [size]="16" /> New {{ m.label }}</a>
+          }
         </div>
 
         @if (error()) { <div class="alert error" role="alert"><app-icon name="alert" />{{ error() }}</div> }
@@ -57,8 +59,12 @@ import { Icon } from '../ui/icon';
                         <td>@if (row[r.key]) { <span class="chip">{{ lookup(r.key, row[r.key]) }}</span> }</td>
                       }
                       <td class="actions">
-                        <a class="btn icon ghost" [routerLink]="['/e', m.route, row['id']]" aria-label="Edit" title="Edit"><app-icon name="edit" [size]="16" /></a>
-                        @if (auth.isAdmin()) {
+                        @if (auth.can(m.route + '.edit')) {
+                          <a class="btn icon ghost" [routerLink]="['/e', m.route, row['id']]" aria-label="Edit" title="Edit"><app-icon name="edit" [size]="16" /></a>
+                        } @else {
+                          <a class="btn icon ghost" [routerLink]="['/e', m.route, row['id']]" aria-label="View details" title="View details"><app-icon name="eye" [size]="16" /></a>
+                        }
+                        @if (auth.can(m.route + '.delete', true)) {
                           <button class="btn icon ghost danger" (click)="remove(m, row)" aria-label="Delete" title="Delete"><app-icon name="trash" [size]="16" /></button>
                         }
                       </td>
@@ -74,7 +80,7 @@ import { Icon } from '../ui/icon';
               <div class="ico"><app-icon [name]="m.icon" [size]="26" /></div>
               <h3>No records yet</h3>
               <p>@if (filter()) { Nothing on this page matches “{{ filter() }}”. } @else { Create the first {{ m.label.toLowerCase() }} to get started. }</p>
-              @if (!filter()) { <a class="btn primary" [routerLink]="['/e', m.route, 'new']"><app-icon name="plus" [size]="16" /> New {{ m.label }}</a> }
+              @if (!filter() && auth.can(m.route + '.create')) { <a class="btn primary" [routerLink]="['/e', m.route, 'new']"><app-icon name="plus" [size]="16" /> New {{ m.label }}</a> }
             </div>
           }
         </div>

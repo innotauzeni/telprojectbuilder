@@ -32,10 +32,14 @@ const ICONS: Record<string, string> = {
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v5M12 18v.5"/>',
   'arrow-up': '<path d="M12 19V5M6 11l6-6 6 6"/>',
-  'arrow-down': '<path d="M12 5v14M6 13l6 6 6-6"/>'
+  'arrow-down': '<path d="M12 5v14M6 13l6 6 6-6"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  shield: '<path d="M12 3 4 6v6c0 4.5 3.3 7.8 8 9 4.7-1.2 8-4.5 8-9V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+  'chevron-down': '<path d="M5 9l7 7 7-7"/>'
 };
 
-export const ICON_NAMES = Object.keys(ICONS).filter((n) => !['x', 'plus', 'edit', 'trash', 'search', 'log-out', 'sun', 'moon', 'chevron-left', 'chevron-right', 'check', 'alert', 'arrow-up', 'arrow-down', 'menu'].includes(n));
+export const ICON_NAMES = Object.keys(ICONS).filter((n) => !['x', 'plus', 'edit', 'trash', 'search', 'log-out', 'sun', 'moon', 'chevron-left', 'chevron-right', 'check', 'alert', 'arrow-up', 'arrow-down', 'menu', 'eye', 'chevron-down'].includes(n));
 
 @Component({
   selector: 'app-icon',

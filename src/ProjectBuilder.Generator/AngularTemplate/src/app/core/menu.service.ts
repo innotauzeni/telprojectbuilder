@@ -4,9 +4,13 @@ import { firstValueFrom } from 'rxjs';
 import { ConfigService } from './config.service';
 import { MetaService } from './meta.service';
 
-export interface MenuEntry { label: string; route: string; icon?: string | null; }
+/** A menu entry. Entries with children are groups (system modules); leaves have a route. */
+export interface MenuEntry { label: string; route?: string | null; icon?: string | null; children?: MenuEntry[] | null; }
 
-/** Navigation menu. Dynamic systems load it from the database (GET /api/menu); others use a fixed menu built from the entities. */
+/**
+ * Navigation menu. Systems with a dynamic menu or access control load it from the database (GET /api/menu, already
+ * filtered for the user's roles); others use a fixed menu built from the entities.
+ */
 @Injectable({ providedIn: 'root' })
 export class MenuService {
   private readonly http = inject(HttpClient);

@@ -28,7 +28,7 @@ public class GeneratedAppEndToEndTests
         Process? proc = null;
         try
         {
-            new ProjectGenerator().WriteTo(ProjectGeneratorTests.Enrolment(), dir);
+            new ProjectGenerator().WriteTo(ProjectGeneratorTests.EnrolmentSimpleMenu(), dir);
             var settings = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "api", "appsettings.json")))!;
             var adminEmail = (string)settings["Seed"]!["AdminEmail"]!;
             var adminPassword = (string)settings["Seed"]!["AdminPassword"]!;
@@ -135,7 +135,7 @@ public class GeneratedAppEndToEndTests
         }
     }
 
-    private static async Task WaitUntilUp(HttpClient http, Process proc)
+    internal static async Task WaitUntilUp(HttpClient http, Process proc)
     {
         var deadline = DateTime.UtcNow.AddMinutes(4); // first run restores + compiles
         while (DateTime.UtcNow < deadline)

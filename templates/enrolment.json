@@ -3,7 +3,8 @@
   "name": "Enrolment System",
   "database": "Sqlite",
   "targets": "WebApi, WebApp, Docker",
-  "dynamicMenu": true,
+  "dynamicMenu": false,
+  "accessControl": true,
   "entities": [
     {
       "name": "Student",

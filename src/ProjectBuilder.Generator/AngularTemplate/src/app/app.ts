@@ -23,12 +23,31 @@ import { Icon } from './ui/icon';
           </a>
           @if (config.preview) { <span class="preview-tag">Preview mode</span> }
           <nav>
-            @for (m of menu.items(); track m.route + m.label) {
-              <a [routerLink]="m.route" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: m.route === '/' }"
-                 (click)="open.set(false)">
-                <app-icon [name]="m.icon || 'table'" [size]="18" />
-                <span>{{ m.label }}</span>
-              </a>
+            @for (m of menu.items(); track m.label) {
+              @if (m.children?.length) {
+                <!-- a system module (menu) with its sub-modules (submenu) -->
+                <button class="group" (click)="toggle(m.label)" [attr.aria-expanded]="isOpen(m.label)">
+                  <app-icon [name]="m.icon || 'table'" [size]="18" />
+                  <span>{{ m.label }}</span>
+                  <app-icon class="chev" [name]="isOpen(m.label) ? 'chevron-down' : 'chevron-right'" [size]="16" />
+                </button>
+                @if (isOpen(m.label)) {
+                  <div class="sub">
+                    @for (c of m.children; track c.label + c.route) {
+                      <a [routerLink]="c.route" routerLinkActive="active" (click)="open.set(false)">
+                        <app-icon [name]="c.icon || 'table'" [size]="16" />
+                        <span>{{ c.label }}</span>
+                      </a>
+                    }
+                  </div>
+                }
+              } @else {
+                <a [routerLink]="m.route" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: m.route === '/' }"
+                   (click)="open.set(false)">
+                  <app-icon [name]="m.icon || 'table'" [size]="18" />
+                  <span>{{ m.label }}</span>
+                </a>
+              }
             }
           </nav>
           <div class="user">
@@ -92,6 +111,11 @@ import { Icon } from './ui/icon';
     nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
     nav a { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border-radius: 10px; color: var(--sidebar-text); font-weight: 520; font-size: .93rem; }
     nav a:hover { background: var(--sidebar-2); color: #fff; }
+    nav .group { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border-radius: 10px; color: var(--sidebar-text); font: inherit; font-weight: 600; font-size: .93rem; background: none; border: 0; cursor: pointer; text-align: left; width: 100%; }
+    nav .group:hover { background: var(--sidebar-2); color: #fff; }
+    nav .group .chev { margin-left: auto; opacity: .7; }
+    nav .sub { display: flex; flex-direction: column; gap: 2px; margin: 0 0 .35rem 1.15rem; padding-left: .55rem; border-left: 1px solid var(--sidebar-2); }
+    nav .sub a { padding: .45rem .7rem; font-size: .88rem; }
     nav a.active { background: var(--primary); color: var(--on-primary); }
     :host-context([data-theme='dark']) nav a.active { color: #0a0f1f; }
     .user { display: flex; align-items: center; gap: .6rem; padding: .75rem .5rem 0; border-top: 1px solid var(--sidebar-2); margin-top: .75rem; }
@@ -126,13 +150,22 @@ export class App {
   private readonly router = inject(Router);
 
   protected readonly open = signal(false);
+  private readonly collapsed = signal<ReadonlySet<string>>(new Set());
+  protected isOpen(label: string) { return !this.collapsed().has(label); }
+  protected toggle(label: string) {
+    const next = new Set(this.collapsed());
+    if (next.has(label)) next.delete(label); else next.add(label);
+    this.collapsed.set(next);
+  }
   protected readonly initials = computed(() =>
     this.meta.appName().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'A');
 
   constructor() {
     // (Re)load the menu whenever someone logs in; it depends on their roles.
     effect(() => {
-      if (this.auth.isLoggedIn()) untracked(() => this.menu.load());
+      if (this.auth.isLoggedIn()) untracked(() => { this.menu.load(); this.auth.loadPermissions(); });
+      // Signed out: forget the previous person's menu so the next user never briefly sees it.
+      else untracked(() => this.menu.items.set([]));
     });
     this.router.events.subscribe((e) => { if (e instanceof NavigationEnd) this.open.set(false); });
   }
