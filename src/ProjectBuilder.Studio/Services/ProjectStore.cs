@@ -5,25 +5,42 @@ namespace ProjectBuilder.Studio.Services;
 public sealed record ProjectSummary(Guid Id, string Name, int EntityCount, DateTime UpdatedUtc);
 public sealed record TemplateInfo(string Key, string Name, int EntityCount);
 
+public sealed class ProjectLimitException(int max) : Exception($"You can have at most {max} projects. Delete one to create another.");
+
 /// <summary>
-/// v0 persistence: one JSON file per project under App_Data/projects (no accounts yet).
-/// Ids are GUIDs generated here, so user input never reaches a file path.
+/// File-based project storage, one folder per user: &lt;data&gt;/projects/&lt;userId&gt;/&lt;projectId&gt;.json.
+/// Every method takes the signed-in user's id, so one user can never read or change another user's project.
+/// Ids are parsed as GUIDs and re-formatted here, so user input never reaches a file path.
 /// </summary>
 public sealed class ProjectStore
 {
-    private readonly string _dir;
+    public const int MaxProjectsPerUser = 50;
+
+    private readonly string _root;
     private readonly string _templateDir;
 
-    public ProjectStore(IWebHostEnvironment env)
+    /// <summary>The folder that holds all Studio data (projects and the accounts database).</summary>
+    public static string DataRoot(IConfiguration config, string contentRoot) =>
+        config["Studio:DataDir"]
+        ?? Environment.GetEnvironmentVariable("STUDIO_DATA_DIR")
+        ?? Path.Combine(contentRoot, "App_Data");
+
+    public ProjectStore(IConfiguration config, IWebHostEnvironment env)
     {
-        // STUDIO_DATA_DIR lets tests (and Docker) keep project files somewhere else.
-        var dataRoot = Environment.GetEnvironmentVariable("STUDIO_DATA_DIR") ?? Path.Combine(env.ContentRootPath, "App_Data");
-        _dir = Path.Combine(dataRoot, "projects");
+        _root = Path.Combine(DataRoot(config, env.ContentRootPath), "projects");
         _templateDir = Path.Combine(AppContext.BaseDirectory, "templates");
-        Directory.CreateDirectory(_dir);
+        Directory.CreateDirectory(_root);
     }
 
-    private string PathFor(Guid id) => Path.Combine(_dir, id.ToString("N") + ".json");
+    private string UserDir(string userId)
+    {
+        if (!Guid.TryParse(userId, out var uid)) throw new ArgumentException("Invalid user id.");
+        var dir = Path.Combine(_root, uid.ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private string PathFor(string userId, Guid id) => Path.Combine(UserDir(userId), id.ToString("N") + ".json");
 
     public IReadOnlyList<TemplateInfo> Templates()
     {
@@ -41,10 +58,10 @@ public sealed class ProjectStore
         return list;
     }
 
-    public IReadOnlyList<ProjectSummary> List()
+    public IReadOnlyList<ProjectSummary> List(string userId)
     {
         var list = new List<ProjectSummary>();
-        foreach (var file in Directory.GetFiles(_dir, "*.json"))
+        foreach (var file in Directory.GetFiles(UserDir(userId), "*.json"))
         {
             if (!Guid.TryParseExact(Path.GetFileNameWithoutExtension(file), "N", out var id)) continue;
             try
@@ -57,24 +74,28 @@ public sealed class ProjectStore
         return list.OrderByDescending(p => p.UpdatedUtc).ToList();
     }
 
-    public AppDefinition? Get(Guid id)
+    /// <summary>Returns the user's project, or null if it does not exist or belongs to someone else.</summary>
+    public AppDefinition? Get(string userId, Guid id)
     {
-        var path = PathFor(id);
+        var path = PathFor(userId, id);
         return File.Exists(path) ? AppDefinitionSerializer.FromJson(File.ReadAllText(path)) : null;
     }
 
-    public void Save(Guid id, AppDefinition def) =>
-        File.WriteAllText(PathFor(id), AppDefinitionSerializer.ToJson(def));
+    public void Save(string userId, Guid id, AppDefinition def) =>
+        File.WriteAllText(PathFor(userId, id), AppDefinitionSerializer.ToJson(def));
 
-    public void Delete(Guid id)
+    public void Delete(string userId, Guid id)
     {
-        var path = PathFor(id);
+        var path = PathFor(userId, id);
         if (File.Exists(path)) File.Delete(path);
     }
 
     /// <summary>Creates a project from a template key (file name without extension), or blank when null.</summary>
-    public Guid Create(string? templateKey)
+    public Guid Create(string userId, string? templateKey)
     {
+        if (Directory.GetFiles(UserDir(userId), "*.json").Length >= MaxProjectsPerUser)
+            throw new ProjectLimitException(MaxProjectsPerUser);
+
         AppDefinition def;
         if (templateKey is null)
             def = new AppDefinition { Name = "My System" };
@@ -86,7 +107,7 @@ public sealed class ProjectStore
             def = AppDefinitionSerializer.FromJson(File.ReadAllText(Path.Combine(_templateDir, match.Key + ".json")));
         }
         var id = Guid.NewGuid();
-        Save(id, def);
+        Save(userId, id, def);
         return id;
     }
 }

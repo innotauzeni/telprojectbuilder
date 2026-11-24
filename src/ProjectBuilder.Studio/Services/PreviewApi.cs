@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Claims;
 using System.Text.Json.Nodes;
 using ProjectBuilder.Core;
 using ProjectBuilder.Generator;
@@ -14,23 +15,28 @@ public static class PreviewApi
     private const int MaxItemsPerEntity = 500;
     private static readonly ConcurrentDictionary<string, List<JsonObject>> Data = new();
 
+    private static string Uid(ClaimsPrincipal u) => u.FindFirstValue(ClaimTypes.NameIdentifier) ?? throw new UnauthorizedAccessException();
+
     public static void Map(WebApplication app)
     {
-        app.MapGet("/preview/{id:guid}/openapi.json", (Guid id, HttpRequest req, ProjectStore store) =>
+        // Everything under /preview needs a signed-in user and only reaches that user's own projects.
+        var g = app.MapGroup("").RequireAuthorization();
+
+        g.MapGet("/preview/{id:guid}/openapi.json", (Guid id, ClaimsPrincipal u, ProjectStore store) =>
         {
-            var def = store.Get(id);
+            var def = store.Get(Uid(u), id);
             if (def is null) return Results.NotFound();
             try { return Results.Content(OpenApiGenerator.Generate(def, $"/preview/{id}"), "application/json"); }
             catch (InvalidDefinitionException ex) { return Results.BadRequest(new { errors = ex.Errors }); }
         });
 
-        app.MapGet("/preview/{id:guid}/swagger", (Guid id) => Results.Content(SwaggerHtml(id), "text/html"));
+        g.MapGet("/preview/{id:guid}/swagger", (Guid id) => Results.Content(SwaggerHtml(id), "text/html"));
 
-        MapWebApp(app);
+        MapWebApp(g, app.Environment.WebRootPath ?? "");
 
         // Menu for the previewed user (the preview user is an Admin, so every visible entry is shown).
-        app.MapGet("/preview/{id:guid}/api/menu", (Guid id, ProjectStore s) =>
-            With(s, id, MenuRoute, (e, list) =>
+        g.MapGet("/preview/{id:guid}/api/menu", (Guid id, ClaimsPrincipal u, ProjectStore s) =>
+            With(s, Uid(u), id, MenuRoute, (e, list) =>
             {
                 lock (list)
                     return Results.Ok(list
@@ -40,10 +46,10 @@ public static class PreviewApi
                         .ToList());
             }));
 
-        var api = app.MapGroup("/preview/{id:guid}/api/{resource}");
+        var api = g.MapGroup("/preview/{id:guid}/api/{resource}");
 
-        api.MapGet("", (Guid id, string resource, ProjectStore s, int page = 1, int pageSize = 20) =>
-            With(s, id, resource, (e, list) =>
+        api.MapGet("", (Guid id, string resource, ClaimsPrincipal u, ProjectStore s, int page = 1, int pageSize = 20) =>
+            With(s, Uid(u), id, resource, (e, list) =>
             {
                 // Like the real API, the menu editor gets a plain array, not a page.
                 if (ReferenceEquals(e, MenuEntity))
@@ -61,18 +67,18 @@ public static class PreviewApi
                 return Results.Ok(result);
             }));
 
-        api.MapGet("{itemId:guid}", (Guid id, string resource, Guid itemId, ProjectStore s) =>
-            With(s, id, resource, (e, list) =>
+        api.MapGet("{itemId:guid}", (Guid id, string resource, Guid itemId, ClaimsPrincipal u, ProjectStore s) =>
+            With(s, Uid(u), id, resource, (e, list) =>
             {
                 lock (list)
                     return list.FirstOrDefault(x => x["id"]!.GetValue<Guid>() == itemId) is { } hit
                         ? Results.Ok(hit.DeepClone()) : Results.NotFound();
             }));
 
-        api.MapPost("", async (Guid id, string resource, HttpRequest req, ProjectStore s) =>
+        api.MapPost("", async (Guid id, string resource, HttpRequest req, ClaimsPrincipal u, ProjectStore s) =>
         {
             var body = await ReadBody(req);
-            return With(s, id, resource, (e, list) =>
+            return With(s, Uid(u), id, resource, (e, list) =>
             {
                 if (Validate(e, body) is { } err) return err;
                 var item = Clean(e, body!);
@@ -87,10 +93,10 @@ public static class PreviewApi
             });
         });
 
-        api.MapPut("{itemId:guid}", async (Guid id, string resource, Guid itemId, HttpRequest req, ProjectStore s) =>
+        api.MapPut("{itemId:guid}", async (Guid id, string resource, Guid itemId, HttpRequest req, ClaimsPrincipal u, ProjectStore s) =>
         {
             var body = await ReadBody(req);
-            return With(s, id, resource, (e, list) =>
+            return With(s, Uid(u), id, resource, (e, list) =>
             {
                 if (Validate(e, body) is { } err) return err;
                 lock (list)
@@ -105,8 +111,8 @@ public static class PreviewApi
             });
         });
 
-        api.MapDelete("{itemId:guid}", (Guid id, string resource, Guid itemId, ProjectStore s) =>
-            With(s, id, resource, (e, list) =>
+        api.MapDelete("{itemId:guid}", (Guid id, string resource, Guid itemId, ClaimsPrincipal u, ProjectStore s) =>
+            With(s, Uid(u), id, resource, (e, list) =>
             {
                 lock (list)
                     return list.RemoveAll(x => x["id"]!.GetValue<Guid>() == itemId) > 0 ? Results.NoContent() : Results.NotFound();
@@ -130,9 +136,9 @@ public static class PreviewApi
         ]
     };
 
-    private static IResult With(ProjectStore store, Guid id, string resource, Func<EntityDefinition, List<JsonObject>, IResult> action)
+    private static IResult With(ProjectStore store, string userId, Guid id, string resource, Func<EntityDefinition, List<JsonObject>, IResult> action)
     {
-        var def = store.Get(id);
+        var def = store.Get(userId, id);
         if (def is null) return Results.NotFound();
 
         if (resource.Equals(MenuRoute, StringComparison.OrdinalIgnoreCase))
@@ -156,25 +162,25 @@ public static class PreviewApi
 
     private static readonly Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider ContentTypes = new();
 
-    private static void MapWebApp(WebApplication app)
+    private static void MapWebApp(RouteGroupBuilder g, string webRoot)
     {
-        var webRoot = app.Environment.WebRootPath ?? "";
         var previewApp = Path.Combine(webRoot, "preview-app");
 
-        app.MapGet("/preview/{id:guid}/app/config.json", (Guid id) =>
+        g.MapGet("/preview/{id:guid}/app/config.json", (Guid id) =>
             Results.Json(new { apiBaseUrl = $"/preview/{id}/api", preview = true }));
 
-        app.MapGet("/preview/{id:guid}/app/entities.json", (Guid id, ProjectStore store) =>
+        g.MapGet("/preview/{id:guid}/app/entities.json", (Guid id, ClaimsPrincipal u, ProjectStore store) =>
         {
-            var def = store.Get(id);
+            var def = store.Get(Uid(u), id);
             if (def is null) return Results.NotFound();
             if (AppDefinitionValidator.Validate(def).Count > 0) return Results.BadRequest(new { errors = AppDefinitionValidator.Validate(def) });
             return Results.Content(WebAppGenerator.EntitiesJson(def), "application/json");
         });
 
         // Everything else: a built file if it exists, otherwise index.html (Angular's router handles the path).
-        app.MapGet("/preview/{id:guid}/app/{**path}", async (Guid id, string? path, HttpContext ctx) =>
+        g.MapGet("/preview/{id:guid}/app/{**path}", async (Guid id, string? path, ClaimsPrincipal u, ProjectStore store) =>
         {
+            if (store.Get(Uid(u), id) is null) return Results.NotFound();
             var index = Path.Combine(previewApp, "index.html");
             if (!File.Exists(index))
                 return Results.Content(NotBuiltHtml, "text/html; charset=utf-8", statusCode: 503);

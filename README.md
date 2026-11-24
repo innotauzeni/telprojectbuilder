@@ -7,9 +7,10 @@ A Flutter mobile app is on the roadmap.
 
 > **Status: early alpha (Phase 1).** Working today: Studio designer, a live preview of the real web app and API, the
 > Enrolment template, API generation for SQLite / SQL Server / PostgreSQL with login and Admin/User roles, a modern
-> Angular web app (light/dark, responsive), an optional database-driven **dynamic menu**, and ZIP download.
-> Not yet: migrations, per-entity permissions, multi-language UI, Flutter app. Do not expose the Studio publicly yet
-> (no accounts). See the [roadmap](docs/ROADMAP.md).
+> Angular web app (light/dark, responsive), an optional database-driven **dynamic menu**, Studio **accounts** (sign up,
+> private projects) and ZIP download.
+> Not yet: migrations, per-entity permissions, multi-language UI, email verification / password reset, Flutter app.
+> See the [roadmap](docs/ROADMAP.md) and [running the Studio online](#running-the-studio-for-other-people).
 
 ## Quick start
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and Node.js 20.19+ / 22.12+ / 24+ (for the Angular Studio).
@@ -41,6 +42,20 @@ docker compose up --build      # API http://localhost:8080/swagger, web app http
 ```
 or without Docker: `cd api && dotnet run --urls http://localhost:5000`, then `cd web && npm install && npm start`.
 The first admin login is in `api/appsettings.json` (generated uniquely for every download); the download's README explains the rest.
+
+## Running the Studio for other people
+The Studio has accounts: people sign up with an email and password, and every project (plus its preview and download)
+is private to its owner. Before putting it on the internet:
+
+- **Use HTTPS.** The sign-in cookie is `HttpOnly` and `SameSite=Lax`, and is marked `Secure` whenever the request is HTTPS.
+  Behind a reverse proxy that terminates TLS, set `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` so the app knows the original scheme.
+- **Keep your data somewhere persistent.** Accounts (`studio.db`) and projects live in the folder given by `STUDIO_DATA_DIR`
+  (default `src/ProjectBuilder.Studio/App_Data`). Mount it as a volume and back it up.
+- **Decide who may register.** Sign-up is open by default. Set `Studio__AllowRegistration=false` to close it
+  (existing users can still sign in; create accounts before closing, or temporarily re-open it).
+- Passwords need 8+ characters with upper and lower case letters, a digit and a symbol; five wrong attempts lock an account for
+  10 minutes, and sign-in/sign-up are limited to 20 requests a minute per address.
+- Each user can keep up to 50 projects. Email verification and password reset are not built yet.
 
 ## How it works
 The designer edits one JSON file (the `AppDefinition`). Generators turn it into plain source code.

@@ -47,7 +47,11 @@ Assumes one developer, ~20–30 focused hours/week. Adjust dates, keep the order
 - [x] Live preview: Swagger "Try it out" against an in-memory mock + generated-code viewer
 - [x] Preview shows the real generated Angular web app (on a demo API) next to Swagger and the generated files; desktop/tablet/phone sizes
 - [ ] Flutter app preview (when that generator exists)
-- [ ] Sign-up/login (ASP.NET Identity), per-user project storage
+- [x] Accounts: sign-up/sign-in (ASP.NET Identity + SQLite), HttpOnly cookie session, private per-user projects, preview/download protected, lockout, rate limiting, CSRF header, registration switch, 50-project cap — API-tested and browser-tested
+- [ ] Email verification and password reset (needs an email provider setting)
+- [ ] Account page: change password, delete account and data
+- [ ] Sharing a project with teammates (viewer / editor)
+- [ ] Postgres/SQL Server option for the Studio's own database (SQLite is fine for a single server)
 
 ### Epic D2 – Product polish
 - [x] Modern design system for the Studio and generated apps: light/dark theme, icons, toasts, confirm dialogs, skeleton loaders, responsive layout

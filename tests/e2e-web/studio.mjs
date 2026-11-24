@@ -12,7 +12,7 @@ import puppeteer from 'puppeteer-core';
 
 const root = resolve(import.meta.dirname, '../..');
 const studioDir = join(root, 'src/ProjectBuilder.Studio');
-const dll = ['Debug', 'Release'].map((c) => join(studioDir, 'bin', c, 'net10.0', 'ProjectBuilder.Studio.dll')).find(existsSync);
+const dll = process.env.STUDIO_DLL ?? ['Debug', 'Release'].map((c) => join(studioDir, 'bin', c, 'net10.0', 'ProjectBuilder.Studio.dll')).find(existsSync);
 if (!dll) { console.error('Build the Studio first: dotnet build src/ProjectBuilder.Studio'); process.exit(2); }
 if (!existsSync(join(studioDir, 'wwwroot/index.html'))) { console.error('Studio web app not built: cd src/studio-web && npm run build'); process.exit(2); }
 if (!existsSync(join(studioDir, 'wwwroot/preview-app/index.html'))) { console.error('Preview app not built: cd src/studio-web && npm run build'); process.exit(2); }
@@ -44,7 +44,7 @@ async function cleanup(code) {
 
 try {
   for (let i = 0; ; i++) {
-    try { if ((await fetch(base + '/api/templates')).ok) break; } catch { /* not yet */ }
+    try { const r = await fetch(base + '/api/account/me'); if (r.ok || r.status === 401) break; } catch { /* not yet */ }
     if (i > 60) throw new Error('Studio did not start');
     await sleep(500);
   }
@@ -67,6 +67,26 @@ try {
     await el.click();
   };
 
+  // ---- accounts: signed-out visitors are sent to sign in; sign up through the UI ----
+  await page.goto(base + '/', { waitUntil: 'networkidle0' });
+  if (!page.url().includes('/login')) throw new Error('a signed-out visitor should land on /login, got ' + page.url());
+  ok('signed-out visitor is redirected to the sign-in page');
+
+  await clickText(page, 'a', 'Create an account');
+  await page.waitForFunction(() => location.pathname === '/register');
+  const email = 'tester' + Date.now() + '@example.com';
+  await setValue(page, '#email', email);
+  await setValue(page, '#password', 'short');
+  await page.click('button[type=submit]');
+  await bodyHas(page, 'at least 8');
+  ok('a weak password is rejected with a clear message');
+
+  await setValue(page, '#password', 'Str0ng!Passw0rd');
+  await page.click('button[type=submit]');
+  await bodyHas(page, 'Build a complete system without writing code');
+  await bodyHas(page, email);
+  ok('account created: lands on the projects page with the email shown in the header');
+
   // ---- home ----
   await page.goto(base + '/', { waitUntil: 'networkidle0' });
   await bodyHas(page, 'Build a complete system without writing code');
@@ -77,6 +97,7 @@ try {
   await clickText(page, 'button', 'Use this template');
   await page.waitForFunction(() => location.pathname.startsWith('/designer/'));
   await page.waitForSelector('#name');
+  const projectId = page.url().split('/').pop();
   const name = await page.$eval('#name', (e) => e.value);
   if (name !== 'Enrolment System') throw new Error('designer did not load the template: ' + name);
   ok('template opens in the designer');
@@ -179,6 +200,28 @@ try {
   const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   if (!['dark', 'light'].includes(theme)) throw new Error('theme not applied');
   ok('theme toggle works (' + theme + ')');
+
+  // ---- sign out: the session ends and the project is no longer reachable ----
+  await page.goto(base + '/', { waitUntil: 'networkidle0' });
+  await clickText(page, 'button', 'Sign out');
+  await page.waitForFunction(() => location.pathname === '/login');
+  const after = await page.evaluate(async (id) => {
+    const codes = [];
+    for (const u of ['/api/projects', '/api/projects/' + id, '/download/' + id, '/preview/' + id + '/app/entities.json'])
+      codes.push((await fetch(u)).status);
+    return codes;
+  }, projectId);
+  if (!after.every((c) => c === 401)) throw new Error('after sign-out everything must be 401, got ' + after.join(', '));
+  ok('signed out: API, download and preview all answer 401');
+
+  await page.goto(base + '/designer/' + projectId, { waitUntil: 'networkidle0' });
+  if (!page.url().includes('/login')) throw new Error('a guarded page should redirect to /login');
+  await setValue(page, '#email', email);
+  await setValue(page, '#password', 'Str0ng!Passw0rd');
+  await page.click('button[type=submit]');
+  await page.waitForFunction((id) => location.pathname === '/designer/' + id, {}, projectId);
+  await page.waitForSelector('#name');
+  ok('signing back in returns to the page you wanted, and the project is still there');
 
   if (problems.length) throw new Error('browser reported errors:\n' + problems.join('\n'));
   ok('no page errors');
